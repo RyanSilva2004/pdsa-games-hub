@@ -10,6 +10,8 @@ type State = {
   board: number[][];
   queenCount: number;
   emptySlots: number;
+  isModalOpen: boolean;
+  gameMessage: string;
 };
 
 const BOARD_SIZE = 8;
@@ -25,6 +27,8 @@ export default class EightQueensPuzzle extends Component<Props, State> {
       board,
       queenCount,
       emptySlots,
+      isModalOpen: false,
+      gameMessage: "",
     };
   }
 
@@ -83,7 +87,9 @@ export default class EightQueensPuzzle extends Component<Props, State> {
                 <span className="text-sm text-gray-600">
                   Total Empty Slots:
                 </span>
-                <span className="font-semibold text-red-600"></span>
+                <span className="font-semibold text-red-600">
+                  {this.countEmptySlots()}
+                </span>
               </div>
             </div>
 
@@ -95,6 +101,30 @@ export default class EightQueensPuzzle extends Component<Props, State> {
             </div>
           </div>
         </div>
+
+        {this.state.isModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                {this.state.gameMessage}
+              </h3>
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={this.handleRestart}
+                  className="px-4 py-2 bg-green-500 text-white rounded-md"
+                >
+                  Restart
+                </button>
+                <button
+                  onClick={this.handleCancel}
+                  className="px-4 py-2 bg-red-500 text-white rounded-md"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     );
   }
@@ -127,14 +157,6 @@ export default class EightQueensPuzzle extends Component<Props, State> {
     const boardSize = newBoard.length;
 
     for (let i = 0; i < boardSize; i++) {
-      for (let j = 0; j < boardSize; j++) {
-        if (newBoard[i][j] !== 1 && newBoard[i][j] !== 2) {
-          newBoard[i][j] = 0;
-        }
-      }
-    }
-
-    for (let i = 0; i < boardSize; i++) {
       if (i !== rowIndex) newBoard[i][colIndex] = 2;
       if (i !== colIndex) newBoard[rowIndex][i] = 2;
     }
@@ -154,11 +176,43 @@ export default class EightQueensPuzzle extends Component<Props, State> {
     return newBoard;
   }
 
+  countEmptySlots = () => {
+    let emptySlotCount = 0;
+    this.state.board.forEach((row) => {
+      row.forEach((cell) => {
+        if (cell === 0) emptySlotCount++;
+      });
+    });
+    return emptySlotCount;
+  };
+
   gameOver = (moves: number, emptySlotsCount: number) => {
-    if (emptySlotsCount === 0 || this.state.queenCount <= MOVES_LIMIT)
-      alert("you won");
-    else {
-      alert("you are out of moves");
+    if (this.state.queenCount === BOARD_SIZE) {
+      this.setState({
+        isModalOpen: true,
+        gameMessage: "You won!",
+      });
+    } else {
+      this.setState({
+        isModalOpen: true,
+        gameMessage: "Game over! You are out of moves.",
+      });
     }
+  };
+
+  handleRestart = () => {
+    const board = Array.from({ length: 8 }, () => Array(8).fill(0));
+    this.setState({
+      board,
+      queenCount: 0,
+      emptySlots: BOARD_SIZE * BOARD_SIZE,
+      isModalOpen: false,
+    });
+  };
+
+  handleCancel = () => {
+    this.setState({
+      isModalOpen: false,
+    });
   };
 }
