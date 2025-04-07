@@ -3,6 +3,9 @@
 import React, { Component } from "react";
 import { PageHeader } from "@/shared/components/page-header";
 import QueenIcon from "@/public/icons/queen.icon";
+import Image from "next/image";
+import WinImage from "@/public/won.gif";
+import LostImage from "@/public/over.gif";
 
 type Props = {};
 
@@ -138,6 +141,29 @@ export default class EightQueensPuzzle extends Component<Props, State> {
         {this.state.isModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center">
+              {this.state.gameMessage === "You won!" && (
+                <div className="mb-4 flex justify-center">
+                  <Image
+                    src={WinImage}
+                    alt="You Won"
+                    width={100}
+                    height={100}
+                    className="mx-auto"
+                  />
+                </div>
+              )}
+              {this.state.gameMessage ===
+                "Game over! You are out of moves." && (
+                <div className="mb-4 flex justify-center">
+                  <Image
+                    src={LostImage}
+                    alt="You Won"
+                    width={100}
+                    height={100}
+                    className="mx-auto"
+                  />
+                </div>
+              )}
               <h3 className="text-2xl font-bold text-gray-800 mb-4">
                 {this.state.gameMessage} - Time:{" "}
                 {this.formatTime(this.state.elapsedTime)}
