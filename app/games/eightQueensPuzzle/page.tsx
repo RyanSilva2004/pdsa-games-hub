@@ -8,14 +8,23 @@ type Props = {};
 
 type State = {
   board: number[][];
+  queenCount: number;
+  emptySlots: number;
 };
+
+const BOARD_SIZE = 8;
+const MOVES_LIMIT = 8;
 
 export default class EightQueensPuzzle extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     const board = Array.from({ length: 8 }, () => Array(8).fill(0));
+    const queenCount = 0;
+    const emptySlots = BOARD_SIZE * BOARD_SIZE;
     this.state = {
       board,
+      queenCount,
+      emptySlots,
     };
   }
 
@@ -53,57 +62,103 @@ export default class EightQueensPuzzle extends Component<Props, State> {
               })
             )}
           </div>
+          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
+            <div className="text-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800">
+                Game Scoreboard
+              </h2>
+            </div>
+
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Remaining Moves:</span>
+                <span className="font-semibold text-blue-600">
+                  {MOVES_LIMIT - this.state.queenCount}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">
+                  Total Empty Slots:
+                </span>
+                <span className="font-semibold text-red-600"></span>
+              </div>
+            </div>
+
+            <div className="w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Value:</span>
+                <span className="font-semibold text-green-600">2</span>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     );
   }
 
   handleClick(rowIndex: number, colIndex: number) {
-    this.findAllPossibleMoves(rowIndex, colIndex);
-    const newBoard = [...this.state.board];
-    newBoard[rowIndex][colIndex] = newBoard[rowIndex][colIndex] === 0 ? 1 : 0;
-    this.setState({ board: newBoard });
+    const updatedBoard = this.findAllPossibleMoves(rowIndex, colIndex);
+
+    let emptySlotCount = 0;
+    updatedBoard.forEach((row) => {
+      row.forEach((cell) => {
+        if (cell === 0) emptySlotCount++;
+      });
+    });
+
+    this.setState(
+      (prev) => ({
+        board: updatedBoard,
+        queenCount: prev.queenCount + 1,
+      }),
+      () => {
+        if (this.state.queenCount === MOVES_LIMIT || emptySlotCount === 0) {
+          this.gameOver(this.state.queenCount, emptySlotCount);
+        }
+      }
+    );
   }
 
-  findAllPossibleMoves(rowIndex: number, colIndex: number) {
-    console.log("rowIndex : ", rowIndex);
-    console.log("colIndex : ", colIndex);
-    const newBoard = [...this.state.board];
+  findAllPossibleMoves(rowIndex: number, colIndex: number): number[][] {
+    const newBoard = this.state.board.map((row) => [...row]);
     const boardSize = newBoard.length;
 
     for (let i = 0; i < boardSize; i++) {
       for (let j = 0; j < boardSize; j++) {
-        if (newBoard[i][j] !== 1) {
+        if (newBoard[i][j] !== 1 && newBoard[i][j] !== 2) {
           newBoard[i][j] = 0;
         }
       }
     }
-    console.log("newBoard : ", newBoard);
+
     for (let i = 0; i < boardSize; i++) {
-      if (i !== rowIndex) {
-        newBoard[i][colIndex] = 2;
-      }
-      if (i !== colIndex) {
-        newBoard[rowIndex][i] = 2;
-      }
+      if (i !== rowIndex) newBoard[i][colIndex] = 2;
+      if (i !== colIndex) newBoard[rowIndex][i] = 2;
     }
 
     for (let i = 1; i < boardSize; i++) {
-      if (rowIndex + i < boardSize && colIndex + i < boardSize) {
+      if (rowIndex + i < boardSize && colIndex + i < boardSize)
         newBoard[rowIndex + i][colIndex + i] = 2;
-      }
-      if (rowIndex - i >= 0 && colIndex - i >= 0) {
+      if (rowIndex - i >= 0 && colIndex - i >= 0)
         newBoard[rowIndex - i][colIndex - i] = 2;
-      }
-      if (rowIndex + i < boardSize && colIndex - i >= 0) {
+      if (rowIndex + i < boardSize && colIndex - i >= 0)
         newBoard[rowIndex + i][colIndex - i] = 2;
-      }
-      console.log("colIndex - i : ", colIndex - i);
-      if (rowIndex - i >= 0 && colIndex + i < boardSize) {
+      if (rowIndex - i >= 0 && colIndex + i < boardSize)
         newBoard[rowIndex - i][colIndex + i] = 2;
-      }
     }
 
-    this.setState({ board: newBoard });
+    newBoard[rowIndex][colIndex] = 1;
+    return newBoard;
   }
+
+  gameOver = (moves: number, emptySlotsCount: number) => {
+    if (emptySlotsCount === 0 || this.state.queenCount <= MOVES_LIMIT)
+      alert("you won");
+    else {
+      alert("you are out of moves");
+    }
+  };
 }
