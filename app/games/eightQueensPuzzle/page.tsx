@@ -12,23 +12,29 @@ type State = {
   emptySlots: number;
   isModalOpen: boolean;
   gameMessage: string;
+  isGameStarted: boolean;
+  startTime: number | null;
+  elapsedTime: number;
 };
 
 const BOARD_SIZE = 8;
 const MOVES_LIMIT = 8;
 
 export default class EightQueensPuzzle extends Component<Props, State> {
+  timerInterval: NodeJS.Timeout | null = null;
+
   constructor(props: Props) {
     super(props);
     const board = Array.from({ length: 8 }, () => Array(8).fill(0));
-    const queenCount = 0;
-    const emptySlots = BOARD_SIZE * BOARD_SIZE;
     this.state = {
       board,
-      queenCount,
-      emptySlots,
+      queenCount: 0,
+      emptySlots: BOARD_SIZE * BOARD_SIZE,
       isModalOpen: false,
       gameMessage: "",
+      isGameStarted: false,
+      startTime: null,
+      elapsedTime: 0,
     };
   }
 
@@ -39,8 +45,33 @@ export default class EightQueensPuzzle extends Component<Props, State> {
           title="Eight Queens Puzzle"
           description="Place 8 queens on a chessboard without threats"
         />
+        <div className="flex justify-center items-center mb-8">
+          <span className="text-lg font-semibold text-gray-700 me-4">
+            Time: {this.formatTime(this.state.elapsedTime)}
+          </span>
+          {!this.state.isGameStarted && (
+            <button
+              onClick={this.handleStartGame}
+              className="w-32 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Start Game
+            </button>
+          )}
+        </div>
 
         <div className="flex justify-center mt-8">
+          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-40 me-5 h-fit">
+            <h2 className="text-lg font-semibold text-gray-700 mb-4">
+              Toolbar
+            </h2>
+            <button
+              onClick={this.handleRestart}
+              className="w-full mb-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              disabled={!this.state.isGameStarted}
+            >
+              Reset
+            </button>
+          </div>
           <div className="grid grid-cols-8 gap-2">
             {this.state.board.map((row, rowIndex) =>
               row.map((cell, colIndex) => {
@@ -56,7 +87,9 @@ export default class EightQueensPuzzle extends Component<Props, State> {
                     key={`${rowIndex}-${colIndex}`}
                     className={`w-16 h-16 ${buttonColor} hover:bg-opacity-80 rounded-lg flex items-center justify-center`}
                     onClick={() => this.handleClick(rowIndex, colIndex)}
-                    disabled={cell === 1 || cell === 2}
+                    disabled={
+                      !this.state.isGameStarted || cell === 1 || cell === 2
+                    }
                   >
                     {cell === 1 ? (
                       <QueenIcon size={25} color="#ffffff" />
@@ -106,7 +139,8 @@ export default class EightQueensPuzzle extends Component<Props, State> {
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center">
               <h3 className="text-2xl font-bold text-gray-800 mb-4">
-                {this.state.gameMessage}
+                {this.state.gameMessage} - Time:{" "}
+                {this.formatTime(this.state.elapsedTime)}
               </h3>
               <div className="flex justify-center space-x-4">
                 <button
@@ -127,6 +161,12 @@ export default class EightQueensPuzzle extends Component<Props, State> {
         )}
       </main>
     );
+  }
+
+  formatTime(timeInSeconds: number) {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = timeInSeconds % 60;
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
   }
 
   handleClick(rowIndex: number, colIndex: number) {
@@ -198,6 +238,8 @@ export default class EightQueensPuzzle extends Component<Props, State> {
         gameMessage: "Game over! You are out of moves.",
       });
     }
+
+    if (this.timerInterval) clearInterval(this.timerInterval);
   };
 
   handleRestart = () => {
@@ -207,12 +249,31 @@ export default class EightQueensPuzzle extends Component<Props, State> {
       queenCount: 0,
       emptySlots: BOARD_SIZE * BOARD_SIZE,
       isModalOpen: false,
+      isGameStarted: false,
+      startTime: null,
+      elapsedTime: 0,
     });
+    if (this.timerInterval) clearInterval(this.timerInterval);
   };
 
   handleCancel = () => {
     this.setState({
       isModalOpen: false,
     });
+  };
+
+  handleStartGame = () => {
+    this.setState({
+      isGameStarted: true,
+      startTime: Date.now(),
+    });
+
+    this.timerInterval = setInterval(() => {
+      this.setState((prevState) => ({
+        elapsedTime: Math.floor(
+          (Date.now() - (prevState.startTime ?? 0)) / 1000
+        ),
+      }));
+    }, 1000);
   };
 }
