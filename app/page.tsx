@@ -1,5 +1,5 @@
-import { GameCard } from "@/shared/components/game-card"
-import { PageHeader } from "@/shared/components/page-header"
+import { GameCard } from "@/shared/components/game-card";
+import { PageHeader } from "@/shared/components/page-header";
 
 export default function HomePage() {
   const games = [
@@ -41,7 +41,7 @@ export default function HomePage() {
       iconColor: "#F59E0B", // Amber color for Eight Queens icon
       status: "coming-soon",
       developer: "Dilshan",
-      path: "/games/game4",
+      path: "/games/eightQueensPuzzle",
     },
     {
       id: "knights-tour",
@@ -53,7 +53,7 @@ export default function HomePage() {
       developer: "Keshana",
       path: "/games/game4",
     },
-  ]
+  ];
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -68,6 +68,5 @@ export default function HomePage() {
         ))}
       </div>
     </main>
-  )
+  );
 }
-
