@@ -100,7 +100,7 @@ export const handleComputerMove = (
     let move: [number, number];
   
     if (strategy === "minimax") {
-    //   move = findBestMoveMinimax(board);
+      move = findBestMoveMinimax(board);
     } else {
       move = findBestMoveGreedy(board);
     }
