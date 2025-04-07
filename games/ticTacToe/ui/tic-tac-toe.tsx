@@ -18,6 +18,7 @@ export function TicTacToe() {
   const [playerName, setPlayerName] = useState("");
   const [playerNameSubmitted, setPlayerNameSubmitted] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
+  const [strategy, setStrategy] = useState<"minimax" | "greedy">("greedy");
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || winner || !isHumanTurn) return;
@@ -27,11 +28,37 @@ export function TicTacToe() {
     setHistory(newHistory);
     setIsHumanTurn(false);
     setCanUndo(true);
+    checkForWinner(newBoard);
   };
 
-  const handleUndo = () => {};
+  const handleUndo = () => {
+    const { newBoard, newHistory, undoAvailable } = handleUndoMove(history);
+    setBoard(newBoard);
+    setHistory(newHistory);
+    setIsHumanTurn(true);
+    setWinner(null);
+    setCanUndo(undoAvailable);
+  };
 
-  const handleComputerTurn = () => {};
+  const checkForWinner = (newBoard: string[][]) => {
+    const result = checkWinner(newBoard);
+    if (result) {
+      setWinner(result);
+    } else if (newBoard.flat().every((cell) => cell !== null)) {
+      setWinner("Draw");
+    }
+  };
+
+  const handleComputerTurn = () => {
+    if (!isHumanTurn && !winner) {
+      const { newBoard, newHistory } = handleComputerMove(board, history, strategy);
+      setBoard(newBoard);
+      setHistory(newHistory);
+      setIsHumanTurn(true);
+      setCanUndo(true);
+      checkForWinner(newBoard);
+    }
+  };
 
   const resetGame = () => {
     setBoard(emptyBoard());
@@ -52,6 +79,17 @@ export function TicTacToe() {
           value={playerName}
           onChange={(e) => setPlayerName(e.target.value)}
         />
+        <div className="flex space-x-4 items-center">
+          <label className="text-sm font-medium">Strategy:</label>
+          <select
+            value={strategy}
+            onChange={(e) => setStrategy(e.target.value as "minimax" | "greedy")}
+            className="border rounded px-2 py-1"
+          >
+            <option value="greedy">Easy</option>
+            <option value="minimax">Hard</option>
+          </select>
+        </div>
         <button
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           onClick={() => {
@@ -73,6 +111,17 @@ export function TicTacToe() {
   return (
     <div className="flex flex-col items-center space-y-4">
       {/* Winner */}
+      {winner && (
+        <div className="mt-6 p-4 bg-gray-100 rounded shadow text-center w-64">
+          <h2 className="text-xl font-semibold text-green-600">
+            {winner === "X"
+              ? `${playerName}, you win! 🎉`
+              : winner === "O"
+              ? `Computer wins 😥`
+              : "It's a draw!"}
+          </h2>
+        </div>
+      )}
 
       <h2 className="text-lg font-medium">
         Hello, {playerName}! It's {isHumanTurn ? "your" : "computer"} turn
