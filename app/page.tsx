@@ -39,7 +39,7 @@ export default function HomePage() {
       description: "Place 8 queens on a chessboard without threats",
       icon: "Puzzle",
       iconColor: "#F59E0B", // Amber color for Eight Queens icon
-      status: "coming-soon",
+      status: "ready",
       developer: "Dilshan",
       path: "/games/eightQueensPuzzle",
     },

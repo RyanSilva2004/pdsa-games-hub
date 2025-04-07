@@ -9,6 +9,12 @@ import LostImage from "@/public/over.gif";
 
 type Props = {};
 
+type ScoreEntry = {
+  name: string;
+  time: number;
+  date: string;
+};
+
 type State = {
   board: number[][];
   queenCount: number;
@@ -18,6 +24,10 @@ type State = {
   isGameStarted: boolean;
   startTime: number | null;
   elapsedTime: number;
+  isHelpModalOpen: boolean;
+  highestScores: ScoreEntry[];
+  playerName: string;
+  isNameModalOpen: boolean;
 };
 
 const BOARD_SIZE = 8;
@@ -38,6 +48,10 @@ export default class EightQueensPuzzle extends Component<Props, State> {
       isGameStarted: false,
       startTime: null,
       elapsedTime: 0,
+      isHelpModalOpen: false,
+      highestScores: [],
+      playerName: "",
+      isNameModalOpen: true,
     };
   }
 
@@ -67,12 +81,20 @@ export default class EightQueensPuzzle extends Component<Props, State> {
             <h2 className="text-lg font-semibold text-gray-700 mb-4">
               Toolbar
             </h2>
+
             <button
               onClick={this.handleRestart}
               className="w-full mb-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               disabled={!this.state.isGameStarted}
             >
               Reset
+            </button>
+
+            <button
+              onClick={() => this.setState({ isHelpModalOpen: true })}
+              className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+            >
+              Help
             </button>
           </div>
           <div className="grid grid-cols-8 gap-2">
@@ -129,14 +151,95 @@ export default class EightQueensPuzzle extends Component<Props, State> {
               </div>
             </div>
 
-            <div className="w-full">
+            <div className="w-full mb-6">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Value:</span>
                 <span className="font-semibold text-green-600">2</span>
               </div>
             </div>
+
+            <div className="w-full border-t pt-4 mt-2">
+              <h3 className="text-md font-semibold text-gray-700 mb-2">
+                Top 10 Scores
+              </h3>
+              {this.state.highestScores &&
+              this.state.highestScores.length > 0 ? (
+                <div className="space-y-2">
+                  {this.state.highestScores.slice(0, 10).map((score, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between text-sm text-gray-700"
+                    >
+                      <span className="w-1/3 truncate">{score.name}</span>
+                      <span className="w-1/3 text-center">{score.time}s</span>
+                      <span className="w-1/3 text-right">{score.date}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 italic">
+                  No scores recorded yet
+                </div>
+              )}
+            </div>
           </div>
         </div>
+
+        {this.state.isNameModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">
+                Enter Your Name
+              </h3>
+              <input
+                type="text"
+                value={this.state.playerName}
+                onChange={(e) => this.setState({ playerName: e.target.value })}
+                placeholder="Your name"
+                className="w-full px-4 py-2 mb-4 border rounded"
+              />
+              <button
+                className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+                onClick={() => this.setState({ isNameModalOpen: false })}
+                disabled={this.state.playerName.trim() === ""}
+              >
+                Start
+              </button>
+            </div>
+          </div>
+        )}
+
+        {this.state.isHelpModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">
+                How to Play
+              </h3>
+              <p className="text-sm text-gray-600 mb-6 text-left">
+                The objective of the Eight Queens Puzzle is to place eight
+                queens on a standard 8×8 chessboard so that no two queens
+                threaten each other.
+                <br />
+                <br />
+                A queen can move any number of squares vertically, horizontally,
+                or diagonally.
+                <br />
+                <br />
+                Your task is to place each queen on the board so that none of
+                them share the same row, column, or diagonal.
+                <br />
+                <br />
+                You win when all 8 queens are placed without conflict.
+              </p>
+              <button
+                onClick={() => this.setState({ isHelpModalOpen: false })}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
 
         {this.state.isModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
