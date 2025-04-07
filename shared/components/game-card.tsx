@@ -1,20 +1,27 @@
-"use client"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Grid, MapPin, BarChart3, Puzzle, Castle, type LucideIcon } from "lucide-react"
-import Link from "next/link"
+"use client";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Grid,
+  MapPin,
+  BarChart3,
+  Puzzle,
+  Castle,
+  type LucideIcon,
+} from "lucide-react";
+import Link from "next/link";
 
 interface GameProps {
   game: {
-    id: string
-    title: string
-    description: string
-    icon: string
-    iconColor?: string
-    status: "ready" | "coming-soon"
-    developer: string
-    path: string
-  }
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    iconColor?: string;
+    status: "ready" | "coming-soon";
+    developer: string;
+    path: string;
+  };
 }
 
 export function GameCard({ game }: GameProps) {
@@ -24,10 +31,10 @@ export function GameCard({ game }: GameProps) {
     BarChart3,
     Puzzle,
     Castle,
-  }
+  };
 
   // Ensure the icon exists in the icons map, fallback to Grid if not
-  const IconComponent = icons[game.icon] || Grid
+  const IconComponent = icons[game.icon] || Grid;
 
   return (
     <Link href={game.path}>
@@ -65,5 +72,5 @@ export function GameCard({ game }: GameProps) {
         </div>
       </Card>
     </Link>
-  )
+  );
 }
