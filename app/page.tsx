@@ -11,7 +11,7 @@ export default function HomePage() {
       iconColor: "#8B5CF6", // Purple color for Tic-Tac-Toe icon
       status: "ready",
       developer: "Ilmee",
-      path: "/games/game1",
+      path: "/games/ticTacToe",
     },
     {
       id: "traveling-salesman",
