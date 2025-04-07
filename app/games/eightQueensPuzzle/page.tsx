@@ -41,6 +41,23 @@ export default class EightQueensPuzzle extends Component<Props, State> {
         />
 
         <div className="flex justify-center mt-8">
+          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-40 me-5 h-fit">
+            <h2 className="text-lg font-semibold text-gray-700 mb-4">
+              Toolbar
+            </h2>
+            <button
+              onClick={this.handleRestart}
+              className="w-full mb-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              Exit
+            </button>
+          </div>
           <div className="grid grid-cols-8 gap-2">
             {this.state.board.map((row, rowIndex) =>
               row.map((cell, colIndex) => {
