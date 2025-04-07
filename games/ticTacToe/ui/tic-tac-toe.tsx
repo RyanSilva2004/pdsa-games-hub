@@ -11,6 +11,9 @@ import {
 } from "@/games/ticTacToe/logic/gameLogic";
 import { getGameResultIfPlayerWins } from "../utils/playerGameLogger";
 import { buildGameResult } from "../utils/computerGameLogger";
+import WinImage from "@/public/won.gif";
+import LostImage from "@/public/over.gif";
+import Image from "next/image";
 
 export function TicTacToe() {
   const [board, setBoard] = useState(emptyBoard());
@@ -51,8 +54,13 @@ export function TicTacToe() {
     const result = checkWinner(newBoard);
     if (result) {
       setWinner(result);
-  
-      const resultData = getGameResultIfPlayerWins(newBoard, history, playerName, strategy);
+
+      const resultData = getGameResultIfPlayerWins(
+        newBoard,
+        history,
+        playerName,
+        strategy
+      );
       if (resultData) {
         console.log("Player winning result:", resultData);
         // send this to backend
@@ -64,15 +72,19 @@ export function TicTacToe() {
 
   const handleComputerTurn = () => {
     if (!isHumanTurn && !winner) {
-      const start = performance.now(); 
-  
-      const { newBoard, newHistory } = handleComputerMove(board, history, strategy);
-  
-      const end = performance.now(); 
+      const start = performance.now();
+
+      const { newBoard, newHistory } = handleComputerMove(
+        board,
+        history,
+        strategy
+      );
+
+      const end = performance.now();
       const duration = end - start;
-  
+
       setComputerMoveDurations((prev) => [...prev, duration]);
-  
+
       setBoard(newBoard);
       setHistory(newHistory);
       setIsHumanTurn(true);
@@ -80,7 +92,6 @@ export function TicTacToe() {
       checkForWinner(newBoard);
     }
   };
-  
 
   const resetGame = () => {
     setBoard(emptyBoard());
@@ -159,14 +170,42 @@ export function TicTacToe() {
     <div className="flex flex-col items-center space-y-4">
       {/* Winner */}
       {winner && (
-        <div className="mt-6 p-4 bg-gray-100 rounded shadow text-center w-64">
-          <h2 className="text-xl font-semibold text-green-600">
-            {winner === "X"
-              ? `${playerName}, you win! 🎉`
-              : winner === "O"
-              ? `Computer wins 😥`
-              : "It's a draw!"}
-          </h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-md shadow-md text-center max-w-xs w-full">
+            <h2 className="text-lg font-semibold text-green-600 mb-3">
+              {winner === "X"
+                ? `${playerName}, you win! 🎉`
+                : winner === "O"
+                ? `Computer wins 😥`
+                : "It's a draw!"}
+            </h2>
+
+            {winner === "X" && (
+              <Image
+                src={WinImage}
+                alt="You Win"
+                width={150}
+                height={150}
+                className="mx-auto mb-3 rounded"
+              />
+            )}
+            {winner === "O" && (
+              <Image
+                src={LostImage}
+                alt="You Lost"
+                width={150}
+                height={150}
+                className="mx-auto mb-3 rounded"
+              />
+            )}
+
+            <button
+              onClick={resetGame}
+              className="mt-1 px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Play Again
+            </button>
+          </div>
         </div>
       )}
 
