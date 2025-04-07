@@ -13,7 +13,7 @@ export function findBestMoveGreedy(board: string[][]): [number, number] {
         let oOpportunityScore = countLines(board, row, col, "O");
 
         // block X
-        let totalScore = xThreatScore * 2 - oOpportunityScore;
+        let totalScore = xThreatScore - oOpportunityScore;
 
         if (totalScore > bestScore) {
           bestScore = totalScore;

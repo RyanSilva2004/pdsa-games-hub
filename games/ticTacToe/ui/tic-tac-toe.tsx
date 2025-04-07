@@ -13,6 +13,7 @@ import { getGameResultIfPlayerWins } from "../utils/playerGameLogger";
 import { buildGameResult } from "../utils/computerGameLogger";
 import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
+import DrawImage from "@/public/draw.gif";
 import Image from "next/image";
 
 export function TicTacToe() {
@@ -195,6 +196,15 @@ export function TicTacToe() {
                 alt="You Lost"
                 width={150}
                 height={150}
+                className="mx-auto mb-3 rounded"
+              />
+            )}
+            {winner === "Draw" && (
+              <Image
+                src={DrawImage}
+                alt="It's a Draw"
+                width={250}
+                height={250}
                 className="mx-auto mb-3 rounded"
               />
             )}
