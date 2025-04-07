@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   emptyBoard,
   handleMove,
@@ -9,6 +9,8 @@ import {
   handleUndoMove,
   BOARD_SIZE,
 } from "@/games/ticTacToe/logic/gameLogic";
+import { getGameResultIfPlayerWins } from "../utils/playerGameLogger";
+import { buildGameResult } from "../utils/computerGameLogger";
 
 export function TicTacToe() {
   const [board, setBoard] = useState(emptyBoard());
@@ -19,6 +21,11 @@ export function TicTacToe() {
   const [playerNameSubmitted, setPlayerNameSubmitted] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [strategy, setStrategy] = useState<"minimax" | "greedy">("greedy");
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [endTime, setEndTime] = useState<Date | null>(null);
+  const [computerMoveDurations, setComputerMoveDurations] = useState<number[]>(
+    []
+  );
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || winner || !isHumanTurn) return;
@@ -44,6 +51,12 @@ export function TicTacToe() {
     const result = checkWinner(newBoard);
     if (result) {
       setWinner(result);
+  
+      const resultData = getGameResultIfPlayerWins(newBoard, history, playerName, strategy);
+      if (resultData) {
+        console.log("Player winning result:", resultData);
+        // send this to backend
+      }
     } else if (newBoard.flat().every((cell) => cell !== null)) {
       setWinner("Draw");
     }
@@ -51,7 +64,15 @@ export function TicTacToe() {
 
   const handleComputerTurn = () => {
     if (!isHumanTurn && !winner) {
+      const start = performance.now(); 
+  
       const { newBoard, newHistory } = handleComputerMove(board, history, strategy);
+  
+      const end = performance.now(); 
+      const duration = end - start;
+  
+      setComputerMoveDurations((prev) => [...prev, duration]);
+  
       setBoard(newBoard);
       setHistory(newHistory);
       setIsHumanTurn(true);
@@ -59,6 +80,7 @@ export function TicTacToe() {
       checkForWinner(newBoard);
     }
   };
+  
 
   const resetGame = () => {
     setBoard(emptyBoard());
@@ -66,7 +88,29 @@ export function TicTacToe() {
     setIsHumanTurn(true);
     setWinner(null);
     setCanUndo(false);
+    setStartTime(new Date());
+    setEndTime(null);
+    setComputerMoveDurations([]);
   };
+
+  useEffect(() => {
+    if (winner && startTime && !endTime) {
+      const end = new Date();
+      setEndTime(end);
+
+      const result = buildGameResult(
+        board,
+        strategy,
+        playerName,
+        startTime,
+        end,
+        computerMoveDurations
+      );
+
+      console.log("Computer game result:", result);
+      // send this to backend
+    }
+  }, [winner]);
 
   if (!playerNameSubmitted) {
     return (
@@ -83,7 +127,9 @@ export function TicTacToe() {
           <label className="text-sm font-medium">Strategy:</label>
           <select
             value={strategy}
-            onChange={(e) => setStrategy(e.target.value as "minimax" | "greedy")}
+            onChange={(e) =>
+              setStrategy(e.target.value as "minimax" | "greedy")
+            }
             className="border rounded px-2 py-1"
           >
             <option value="greedy">Easy</option>
@@ -95,6 +141,7 @@ export function TicTacToe() {
           onClick={() => {
             if (playerName.trim()) {
               setPlayerNameSubmitted(true);
+              setStartTime(new Date());
             }
           }}
         >
