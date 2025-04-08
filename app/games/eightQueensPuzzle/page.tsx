@@ -15,6 +15,13 @@ type ScoreEntry = {
   date: string;
 };
 
+type userGameSummary = {
+  playerName: string;
+  moves: number[][];
+  timeTaken: string;
+  result: "win" | "lose" | null;
+};
+
 type State = {
   board: number[][];
   queenCount: number;
@@ -28,6 +35,7 @@ type State = {
   highestScores: ScoreEntry[];
   playerName: string;
   isNameModalOpen: boolean;
+  gameHistory: userGameSummary;
 };
 
 const BOARD_SIZE = 8;
@@ -39,6 +47,13 @@ export default class EightQueensPuzzle extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     const board = Array.from({ length: 8 }, () => Array(8).fill(0));
+
+    const gameHistory = {
+      playerName: "",
+      moves: board,
+      timeTaken: "",
+      result: null,
+    };
     this.state = {
       board,
       queenCount: 0,
@@ -52,6 +67,7 @@ export default class EightQueensPuzzle extends Component<Props, State> {
       highestScores: [],
       playerName: "",
       isNameModalOpen: true,
+      gameHistory,
     };
   }
 
@@ -356,6 +372,8 @@ export default class EightQueensPuzzle extends Component<Props, State> {
   };
 
   gameOver = (moves: number, emptySlotsCount: number) => {
+    console.log("game over");
+
     if (this.state.queenCount === BOARD_SIZE) {
       this.setState({
         isModalOpen: true,
@@ -367,6 +385,13 @@ export default class EightQueensPuzzle extends Component<Props, State> {
         gameMessage: "Game over! You are out of moves.",
       });
     }
+
+    this.updateUserGameHistory({
+      playerName: this.state.playerName,
+      moves: this.state.board,
+      timeTaken: this.state.elapsedTime.toString(),
+      result: this.state.gameMessage.includes("won") ? "win" : "lose",
+    });
 
     if (this.timerInterval) clearInterval(this.timerInterval);
   };
@@ -404,5 +429,19 @@ export default class EightQueensPuzzle extends Component<Props, State> {
         ),
       }));
     }, 1000);
+  };
+
+  updateUserGameHistory = (data: userGameSummary) => {
+    console.log("game history data : ", data);
+  };
+
+  sendGameDataToServer = async () => {
+    if (this.state.gameHistory) {
+      await fetch("/api/save-game", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(this.state.gameHistory),
+      });
+    }
   };
 }
