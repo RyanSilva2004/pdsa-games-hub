@@ -30,6 +30,9 @@ export function TicTacToe() {
   const [computerMoveDurations, setComputerMoveDurations] = useState<number[]>(
     []
   );
+  const [playerWins, setPlayerWins] = useState(0);
+  const [computerWins, setComputerWins] = useState(0);
+  const [draws, setDraws] = useState(0);
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || winner || !isHumanTurn) return;
@@ -56,6 +59,14 @@ export function TicTacToe() {
     if (result) {
       setWinner(result);
 
+      if (result === "X") {
+        setPlayerWins((prev) => prev + 1);
+      } else if (result === "O") {
+        setComputerWins((prev) => prev + 1);
+      } else {
+        setDraws((prev) => prev + 1);
+      }
+
       const resultData = getGameResultIfPlayerWins(
         newBoard,
         history,
@@ -68,6 +79,7 @@ export function TicTacToe() {
       }
     } else if (newBoard.flat().every((cell) => cell !== null)) {
       setWinner("Draw");
+      setDraws((prev) => prev + 1);
     }
   };
 
@@ -126,12 +138,14 @@ export function TicTacToe() {
 
   if (!playerNameSubmitted) {
     return (
-      <div className="flex flex-col items-center space-y-4">
-        <h2 className="text-xl font-semibold">Enter Your Name to Start</h2>
+      <div className="flex flex-col items-center space-y-4 p-4">
+        <h2 className="text-2xl font-semibold text-center">
+          Enter Your Name to Start
+        </h2>
         <input
           type="text"
           placeholder="Your name"
-          className="border rounded px-3 py-2"
+          className="border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-60"
           value={playerName}
           onChange={(e) => setPlayerName(e.target.value)}
         />
@@ -142,14 +156,14 @@ export function TicTacToe() {
             onChange={(e) =>
               setStrategy(e.target.value as "minimax" | "greedy")
             }
-            className="border rounded px-2 py-1"
+            className="border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="greedy">Easy</option>
             <option value="minimax">Hard</option>
           </select>
         </div>
         <button
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-300"
           onClick={() => {
             if (playerName.trim()) {
               setPlayerNameSubmitted(true);
@@ -168,12 +182,12 @@ export function TicTacToe() {
   }
 
   return (
-    <div className="flex flex-col items-center space-y-4">
+    <div className="flex flex-col items-center space-y-6 p-3">
       {/* Winner */}
       {winner && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-md shadow-md text-center max-w-xs w-full">
-            <h2 className="text-lg font-semibold text-green-600 mb-3">
+          <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-xs w-full">
+            <h2 className="text-2xl font-semibold text-green-600 mb-3">
               {winner === "X"
                 ? `${playerName}, you win! 🎉`
                 : winner === "O"
@@ -187,7 +201,7 @@ export function TicTacToe() {
                 alt="You Win"
                 width={150}
                 height={150}
-                className="mx-auto mb-3 rounded"
+                className="mx-auto mb-3 rounded-full"
               />
             )}
             {winner === "O" && (
@@ -196,7 +210,7 @@ export function TicTacToe() {
                 alt="You Lost"
                 width={150}
                 height={150}
-                className="mx-auto mb-3 rounded"
+                className="mx-auto mb-3 rounded-full"
               />
             )}
             {winner === "Draw" && (
@@ -205,13 +219,13 @@ export function TicTacToe() {
                 alt="It's a Draw"
                 width={150}
                 height={150}
-                className="mx-auto mb-3 rounded"
+                className="mx-auto mb-3 rounded-full"
               />
             )}
 
             <button
               onClick={resetGame}
-              className="mt-1 px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="mt-4 px-5 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-300"
             >
               Play Again
             </button>
@@ -219,45 +233,97 @@ export function TicTacToe() {
         </div>
       )}
 
-      <h2 className="text-lg font-medium">
+      <h2 className="text-xl font-medium text-center">
         Hello, {playerName}! It's {isHumanTurn ? "your" : "computer"} turn
       </h2>
 
-      {/* Game Board */}
-      <div className="grid grid-cols-5 gap-1">
-        {board.map((row, rowIndex) =>
-          row.map((cell, colIndex) => (
+      <div className="flex flex-row space-x-6 items-center">
+        {/* Game Board */}
+        <div className="flex flex-col items-center space-y-6 p-2">
+          <div className="grid grid-cols-5 gap-1 mt-6">
+            {board.map((row, rowIndex) =>
+              row.map((cell, colIndex) => (
+                <button
+                  key={`${rowIndex}-${colIndex}`}
+                  className="w-16 h-16 border border-gray-400 text-2xl font-bold flex items-center justify-center hover:bg-gray-200 active:bg-gray-300 rounded transition duration-300"
+                  onClick={() => handleClick(rowIndex, colIndex)}
+                  disabled={!!cell || !!winner || !isHumanTurn}
+                >
+                  {cell}
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="flex space-x-6 mt-6">
             <button
-              key={`${rowIndex}-${colIndex}`}
-              className="w-16 h-16 border border-gray-400 text-2xl font-bold flex items-center justify-center hover:bg-gray-100"
-              onClick={() => handleClick(rowIndex, colIndex)}
-              disabled={!!cell || !!winner || !isHumanTurn}
+              onClick={resetGame}
+              className="px-6 py-3 bg-green-500 text-white rounded hover:bg-green-600 transition duration-300"
             >
-              {cell}
+              Restart Game
             </button>
-          ))
-        )}
-      </div>
 
-      <div className="flex space-x-4 mt-4">
-        <button
-          onClick={resetGame}
-          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-        >
-          Restart Game
-        </button>
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo || history.length < 2 || winner !== null}
+              className={`px-6 py-3 rounded text-white ${
+                !canUndo || history.length < 2 || winner
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-yellow-500 hover:bg-yellow-600"
+              } transition duration-300`}
+            >
+              Undo Last Move
+            </button>
+          </div>
+        </div>
 
-        <button
-          onClick={handleUndo}
-          disabled={!canUndo || history.length < 2 || winner !== null}
-          className={`px-4 py-2 rounded text-white ${
-            !canUndo || history.length < 2 || winner
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-yellow-500 hover:bg-yellow-600"
-          }`}
-        >
-          Undo Last Move
-        </button>
+        {/* Scoreboard */}
+        <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 h-fit ms-5">
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold text-gray-2000">
+              Game Scoreboard
+            </h2>
+          </div>
+
+          <div className="mb-4 w-full">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-400">Level</span>
+              <span className="font-semibold text-gray-300">{strategy === "greedy" ? "Easy" : "Hard"}</span>
+            </div>
+          </div>
+
+          <div className="mb-4 w-full">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-400">Player</span>
+              <span className="font-semibold text-gray-300">{playerName}</span>
+            </div>
+          </div>
+
+          <div className="mb-4 w-full">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Player Wins</span>
+              <span className="font-semibold text-green-400">{playerWins}</span>
+            </div>
+          </div>
+
+          <div className="mb-4 w-full">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Computer Wins</span>
+              <span className="font-semibold text-blue-400">
+                {computerWins}
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Draws</span>
+              <span className="font-semibold text-yellow-400">{draws}</span>
+            </div>
+          </div>
+
+          
+        </div>
       </div>
     </div>
   );
