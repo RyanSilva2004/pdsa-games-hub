@@ -203,8 +203,8 @@ export function TicTacToe() {
               <Image
                 src={DrawImage}
                 alt="It's a Draw"
-                width={250}
-                height={250}
+                width={150}
+                height={150}
                 className="mx-auto mb-3 rounded"
               />
             )}
@@ -256,7 +256,7 @@ export function TicTacToe() {
               : "bg-yellow-500 hover:bg-yellow-600"
           }`}
         >
-          Undo Last Round
+          Undo Last Move
         </button>
       </div>
     </div>
