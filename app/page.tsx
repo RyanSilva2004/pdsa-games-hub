@@ -1,5 +1,5 @@
-import { GameCard } from "@/shared/components/game-card"
-import { PageHeader } from "@/shared/components/page-header"
+import { GameCard } from "@/shared/components/game-card";
+import { PageHeader } from "@/shared/components/page-header";
 
 export default function HomePage() {
   const games = [
@@ -11,7 +11,7 @@ export default function HomePage() {
       iconColor: "#8B5CF6", // Purple color for Tic-Tac-Toe icon
       status: "ready",
       developer: "Ilmee",
-      path: "/games/game1",
+      path: "/games/ticTacToe",
     },
     {
       id: "traveling-salesman",
@@ -39,9 +39,9 @@ export default function HomePage() {
       description: "Place 8 queens on a chessboard without threats",
       icon: "Puzzle",
       iconColor: "#F59E0B", // Amber color for Eight Queens icon
-      status: "coming-soon",
+      status: "ready",
       developer: "Dilshan",
-      path: "/games/game4",
+      path: "/games/eightQueensPuzzle",
     },
     {
       id: "knights-tour",
@@ -53,7 +53,7 @@ export default function HomePage() {
       developer: "Keshana",
       path: "/games/game4",
     },
-  ]
+  ];
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -68,6 +68,5 @@ export default function HomePage() {
         ))}
       </div>
     </main>
-  )
+  );
 }
-
