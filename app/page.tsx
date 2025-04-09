@@ -19,7 +19,7 @@ export default function HomePage() {
       description: "Find the shortest route between cities",
       icon: "MapPin",
       iconColor: "#3B82F6", // Blue color for Traveling Salesman icon
-      status: "coming-soon",
+      status: "ready",
       developer: "Ryan",
       path: "/games/game2",
     },
