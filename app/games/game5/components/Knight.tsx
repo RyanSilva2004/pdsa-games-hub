@@ -1,4 +1,3 @@
-// app/games/knights-tour/components/Knight.tsx
 import { FC } from "react";
 
 interface KnightProps {
