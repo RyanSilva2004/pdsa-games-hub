@@ -22,9 +22,14 @@ type State = {
   isNameModalOpen: boolean;
   selectedDisk: number | null; // Track the selected disk
   sourcePeg: number | null; // Track the source peg for the selected disk
+  timeLimit: number; // Game time limit in seconds
+  isGameOver: boolean; // Game over status
 };
 
 const NUM_DISKS = 5;
+const PEG_HEIGHT = 384;
+const DISK_HEIGHT = 20;
+const BASE_DISK_WIDTH = 40;
 
 export default class TowerOfHanoi extends Component<Props, State> {
   timerInterval: NodeJS.Timeout | null = null;
@@ -50,6 +55,8 @@ export default class TowerOfHanoi extends Component<Props, State> {
       isNameModalOpen: true,
       selectedDisk: null,
       sourcePeg: null,
+      timeLimit: 300, // 5 minutes
+      isGameOver: false, // Initially, game is not over
     };
   }
 
