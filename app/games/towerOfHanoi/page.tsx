@@ -85,6 +85,33 @@ export default class TowerOfHanoi extends Component<Props, State> {
     }, 1000);
   };
   
+  handleNameSubmit = () => {
+    if (this.state.playerName.trim() !== "") {
+      this.setState({ 
+        isNameModalOpen: false,
+        isGameStarted: true,
+        startTime: Date.now(),
+      });
+  
+      this.timerInterval = setInterval(() => {
+        const elapsedTime = Math.floor((Date.now() - (this.state.startTime ?? 0)) / 1000);
+        
+        if (elapsedTime >= this.state.timeLimit) {
+          this.setState({
+            isModalOpen: true,
+            gameMessage: "Game over! Time's up!",
+            isGameOver: true,
+            isGameStarted: false,
+          });
+          if (this.timerInterval) clearInterval(this.timerInterval);
+          return;
+        }
+  
+        this.setState({ elapsedTime });
+      }, 1000);
+    }
+  };
+  
 
   render() {
     return (
