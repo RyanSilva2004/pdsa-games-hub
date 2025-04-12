@@ -6,6 +6,8 @@ import QueenIcon from "@/public/icons/queen.icon";
 import Image from "next/image";
 import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
+import axios from "axios";
+import { API_URL } from "@/app/config";
 
 type Props = {};
 
@@ -36,6 +38,7 @@ type State = {
   playerName: string;
   isNameModalOpen: boolean;
   gameHistory: userGameSummary;
+  testMessage: string;
 };
 
 const BOARD_SIZE = 8;
@@ -68,7 +71,19 @@ export default class EightQueensPuzzle extends Component<Props, State> {
       playerName: "",
       isNameModalOpen: true,
       gameHistory,
+      testMessage: "",
     };
+  }
+
+  componentDidMount() {
+    axios
+      .get(`${API_URL}/`)
+      .then((response) => {
+        this.setState({ testMessage: response.data.message });
+      })
+      .catch((error) => {
+        console.error("Error fetching test message:", error);
+      });
   }
 
   render() {
