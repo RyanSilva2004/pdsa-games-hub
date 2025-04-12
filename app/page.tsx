@@ -51,7 +51,7 @@ export default function HomePage() {
       iconColor: "#EC4899", // Pink color for Knight's Tour icon
       status: "coming-soon",
       developer: "Keshana",
-      path: "/games/game4",
+      path: "/games/game5",
     },
   ]
 
