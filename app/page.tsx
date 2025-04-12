@@ -29,9 +29,9 @@ export default function HomePage() {
       description: "Solve the classic disk stacking puzzle",
       icon: "BarChart3",
       iconColor: "#10B981", // Green color for Tower of Hanoi icon
-      status: "coming-soon",
+      status: "ready",
       developer: "Roshan",
-      path: "/games/game3",
+      path: "/games/towerOfHanoi",
     },
     {
       id: "eight-queens",
