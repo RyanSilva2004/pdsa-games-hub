@@ -32,6 +32,9 @@ const DISK_HEIGHT = 20;
 const BASE_DISK_WIDTH = 40;
 
 export default class TowerOfHanoi extends Component<Props, State> {
+  checkWinCondition() {
+    throw new Error("Method not implemented.");
+  }
   timerInterval: NodeJS.Timeout | null = null;
 
   constructor(props: Props) {
@@ -109,6 +112,44 @@ export default class TowerOfHanoi extends Component<Props, State> {
   
         this.setState({ elapsedTime });
       }, 1000);
+    }
+  };
+  
+  handlePegClick = (pegIndex: number) => {
+    if (this.state.isGameOver || !this.state.isGameStarted) return;
+    
+    const { pegs, selectedDisk, sourcePeg } = this.state;
+  
+    if (selectedDisk === null) {
+      if (pegs[pegIndex].length > 0) {
+        const diskToMove = pegs[pegIndex][pegs[pegIndex].length - 1];
+        this.setState({ 
+          selectedDisk: diskToMove,
+          sourcePeg: pegIndex,
+        });
+      }
+    } else {
+      const targetPeg = pegs[pegIndex];
+      
+      if (targetPeg.length === 0 || targetPeg[targetPeg.length - 1] > selectedDisk) {
+        const newPegs = [...pegs];
+        newPegs[sourcePeg!].pop();
+        newPegs[pegIndex].push(selectedDisk);
+        
+        this.setState({
+          pegs: newPegs,
+          moveCount: this.state.moveCount + 1,
+          selectedDisk: null,
+          sourcePeg: null,
+        });
+        
+        this.checkWinCondition();
+      } else {
+        this.setState({ 
+          selectedDisk: null,
+          sourcePeg: null,
+        });
+      }
     }
   };
   
