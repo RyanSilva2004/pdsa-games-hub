@@ -60,6 +60,32 @@ export default class TowerOfHanoi extends Component<Props, State> {
     };
   }
 
+  handleStartGame = () => {
+    this.setState({
+      isGameStarted: true,
+      startTime: Date.now(),
+      isGameOver: false,
+    });
+  
+    this.timerInterval = setInterval(() => {
+      const elapsedTime = Math.floor((Date.now() - (this.state.startTime ?? 0)) / 1000);
+  
+      if (elapsedTime >= this.state.timeLimit) {
+        this.setState({
+          isModalOpen: true,
+          gameMessage: "Game over! Time's up!",
+          isGameOver: true,
+          isGameStarted: false,
+        });
+        if (this.timerInterval) clearInterval(this.timerInterval);
+        return;
+      }
+  
+      this.setState({ elapsedTime });
+    }, 1000);
+  };
+  
+
   render() {
     return (
       <main className="container mx-auto px-4 py-8">
