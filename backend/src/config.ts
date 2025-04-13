@@ -1,4 +1,0 @@
-module.exports = {
-  API_PORT: 5000,
-  FRONTEND_PORT: 3000,
-};
