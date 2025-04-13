@@ -6,6 +6,7 @@ import QueenIcon from "@/public/icons/queen.icon";
 import Image from "next/image";
 import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
+import findAllNQueensSolutions from "./utils/eightQueensSolver";
 
 type ScoreEntry = {
   name: string;
@@ -109,9 +110,9 @@ const EightQueensPuzzle = () => {
   };
 
   const gameOver = (moves: number, emptySlotsCount: number) => {
-    console.log("game over");
+    console.log("queenCount : ", queenCount);
 
-    if (queenCount === BOARD_SIZE) {
+    if (queenCount + 1 === BOARD_SIZE) {
       setIsModalOpen(true);
       setGameMessage("You won!");
     } else {
@@ -185,6 +186,10 @@ const EightQueensPuzzle = () => {
       if (timerInterval) clearInterval(timerInterval);
     };
   }, [timerInterval]);
+
+  useEffect(() => {
+    console.log("results ", findAllNQueensSolutions(BOARD_SIZE));
+  }, []);
 
   return (
     <main className="container mx-auto px-4 py-8">
