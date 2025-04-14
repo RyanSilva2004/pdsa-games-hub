@@ -17,7 +17,7 @@ const Chessboard: FC = () => {
     "playing"
   );
 
-
+  // Live timer update
   useEffect(() => {
     const timer = setInterval(() => {
       if (gameStatus === "playing") {
@@ -27,6 +27,7 @@ const Chessboard: FC = () => {
     return () => clearInterval(timer);
   }, [gameStatus, startTime]);
 
+  // Initialize board
   useEffect(() => {
     const row = Math.floor(Math.random() * boardSize);
     const col = Math.floor(Math.random() * boardSize);
@@ -44,51 +45,58 @@ const Chessboard: FC = () => {
       });
   }, []);
 
-  const checkGameStatus = (newVisited: Set<string>) => {
-    if (newVisited.size === boardSize * boardSize) {
+  // Check game status after moves
+  useEffect(() => {
+    if (visited.size > 0) {
+      checkGameStatus(visited);
+    }
+  }, [visited, knightPosition]);
+
+  const checkGameStatus = (visited: Set<string>) => {
+    if (visited.size === boardSize * boardSize) {
       setGameStatus("win");
-    } else {
-      let hasValidMove = false;
-      const moves = [
-        [2, 1],
-        [1, 2],
-        [-1, 2],
-        [-2, 1],
-        [-2, -1],
-        [-1, -2],
-        [1, -2],
-        [2, -1],
-      ];
-      for (const [dr, dc] of moves) {
-        const nextRow = knightPosition.row + dr;
-        const nextCol = knightPosition.col + dc;
-        if (
-          nextRow >= 0 &&
-          nextRow < boardSize &&
-          nextCol >= 0 &&
-          nextCol < boardSize &&
-          !newVisited.has(`${nextRow}-${nextCol}`)
-        ) {
-          hasValidMove = true;
-          break;
-        }
-      }
-      if (!hasValidMove) {
-        setGameStatus("loss");
-      }
+    } else if (getValidMoves().length === 0) {
+      setGameStatus("loss");
     }
   };
 
+  const getValidMoves = () => {
+    const moves = [
+      [2, 1],
+      [1, 2],
+      [-1, 2],
+      [-2, 1],
+      [-2, -1],
+      [-1, -2],
+      [1, -2],
+      [2, -1],
+    ];
+    const validMoves = moves
+      .map(([dr, dc]) => ({
+        row: knightPosition.row + dr,
+        col: knightPosition.col + dc,
+      }))
+      .filter(
+        ({ row, col }) =>
+          row >= 0 &&
+          row < boardSize &&
+          col >= 0 &&
+          col < boardSize &&
+          !visited.has(`${row}-${col}`)
+      );
+    console.log("Valid moves:", validMoves);
+    return validMoves;
+  };
+
   const handleSquareClick = (row: number, col: number) => {
+    if (gameStatus !== "playing") return;
     if (
-      gameStatus === "playing" &&
       isValidKnightMove(knightPosition.row, knightPosition.col, row, col) &&
       !visited.has(`${row}-${col}`)
     ) {
       setKnightPosition({ row, col });
       const newVisited = new Set(visited).add(`${row}-${col}`);
       setVisited(newVisited);
-      checkGameStatus(newVisited);
     }
   };
 
@@ -107,18 +115,32 @@ const Chessboard: FC = () => {
         {squares.map((row, rowIndex) =>
           row.map((square, colIndex) => {
             const isVisited = visited.has(`${rowIndex}-${colIndex}`);
+            const isValidMove = getValidMoves().some(
+              (move) => move.row === rowIndex && move.col === colIndex
+            );
             return (
               <div
                 key={`${rowIndex}-${colIndex}`}
-                className={`w-[50px] h-[50px] cursor-pointer ${
+                className={`w-[50px] h-[50px] ${
+                  gameStatus === "playing" ? "cursor-pointer" : "cursor-default"
+                } relative ${
                   isVisited
                     ? "bg-green-200"
+                    : isValidMove
+                    ? "bg-yellow-200"
                     : (rowIndex + colIndex) % 2 === 0
                     ? "bg-white"
                     : "bg-gray-400"
                 }`}
                 onClick={() => handleSquareClick(rowIndex, colIndex)}
-              />
+              >
+                {isVisited && (
+                  <span className="absolute top-0 left-1 text-xs text-black">
+                    {visited.size -
+                      [...visited].indexOf(`${rowIndex}-${colIndex}`)}
+                  </span>
+                )}
+              </div>
             );
           })
         )}
