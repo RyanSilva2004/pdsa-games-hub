@@ -1,9 +1,11 @@
 "use client";
-import { FC, useState, useEffect } from "react";
+import { FC, useState, useEffect, useMemo } from "react";
 import Knight from "./Knight";
 import GameStatus from "./GameStatus";
+import AlgorithmSelector from "./AlgorithmSelector";
 import { isValidKnightMove } from "../util/utils";
 import { solveKnightsTourBacktracking } from "../logic/backtracking";
+import { solveKnightsTourWarnsdorff } from "../logic/warnsdorff";
 
 const Chessboard: FC = () => {
   const boardSize = 8;
@@ -11,11 +13,48 @@ const Chessboard: FC = () => {
   const [visited, setVisited] = useState<Set<string>>(new Set());
   const [solution, setSolution] = useState<number[][] | null>(null);
   const [isComputingSolution, setIsComputingSolution] = useState(false);
-  const [startTime] = useState<number>(Date.now());
+  const [startTime, setStartTime] = useState<number>(Date.now());
   const [timeTaken, setTimeTaken] = useState<number>(0);
   const [gameStatus, setGameStatus] = useState<"playing" | "win" | "loss">(
     "playing"
   );
+  const [algorithm, setAlgorithm] = useState<"backtracking" | "warnsdorff">(
+    "backtracking"
+  );
+
+  // Function to solve the knight's tour based on selected algorithm
+  const solveTour = async (row: number, col: number) => {
+    setIsComputingSolution(true);
+    try {
+      let result;
+      if (algorithm === "backtracking") {
+        result = await solveKnightsTourBacktracking(
+          row,
+          col,
+          boardSize,
+          500000,
+          1000
+        );
+      } else {
+        result = await solveKnightsTourWarnsdorff(row, col, boardSize);
+      }
+      setSolution(result);
+    } catch (error) {
+      console.error("Failed to compute solution:", error);
+      setSolution(null);
+    } finally {
+      setIsComputingSolution(false);
+    }
+  };
+
+  // Initialize board
+  useEffect(() => {
+    const row = Math.floor(Math.random() * boardSize);
+    const col = Math.floor(Math.random() * boardSize);
+    setKnightPosition({ row, col });
+    setVisited(new Set([`${row}-${col}`]));
+    solveTour(row, col);
+  }, [algorithm]);
 
   // Live timer update
   useEffect(() => {
@@ -26,24 +65,6 @@ const Chessboard: FC = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [gameStatus, startTime]);
-
-  // Initialize board
-  useEffect(() => {
-    const row = Math.floor(Math.random() * boardSize);
-    const col = Math.floor(Math.random() * boardSize);
-    setKnightPosition({ row, col });
-    setVisited(new Set([`${row}-${col}`]));
-    setIsComputingSolution(true);
-    solveKnightsTourBacktracking(row, col, 8, 500000, 1000)
-      .then((result) => {
-        setSolution(result);
-        setIsComputingSolution(false);
-      })
-      .catch(() => {
-        setSolution(null);
-        setIsComputingSolution(false);
-      });
-  }, []);
 
   // Check game status after moves
   useEffect(() => {
@@ -60,7 +81,7 @@ const Chessboard: FC = () => {
     }
   };
 
-  const getValidMoves = () => {
+  const getValidMoves = useMemo(() => {
     const moves = [
       [2, 1],
       [1, 2],
@@ -71,22 +92,21 @@ const Chessboard: FC = () => {
       [1, -2],
       [2, -1],
     ];
-    const validMoves = moves
-      .map(([dr, dc]) => ({
-        row: knightPosition.row + dr,
-        col: knightPosition.col + dc,
-      }))
-      .filter(
-        ({ row, col }) =>
-          row >= 0 &&
-          row < boardSize &&
-          col >= 0 &&
-          col < boardSize &&
-          !visited.has(`${row}-${col}`)
-      );
-    console.log("Valid moves:", validMoves);
-    return validMoves;
-  };
+    return () =>
+      moves
+        .map(([dr, dc]) => ({
+          row: knightPosition.row + dr,
+          col: knightPosition.col + dc,
+        }))
+        .filter(
+          ({ row, col }) =>
+            row >= 0 &&
+            row < boardSize &&
+            col >= 0 &&
+            col < boardSize &&
+            !visited.has(`${row}-${col}`)
+        );
+  }, [knightPosition, visited]);
 
   const handleSquareClick = (row: number, col: number) => {
     if (gameStatus !== "playing") return;
@@ -95,9 +115,19 @@ const Chessboard: FC = () => {
       !visited.has(`${row}-${col}`)
     ) {
       setKnightPosition({ row, col });
-      const newVisited = new Set(visited).add(`${row}-${col}`);
-      setVisited(newVisited);
+      setVisited(new Set(visited).add(`${row}-${col}`));
     }
+  };
+
+  const resetGame = () => {
+    const row = Math.floor(Math.random() * boardSize);
+    const col = Math.floor(Math.random() * boardSize);
+    setKnightPosition({ row, col });
+    setVisited(new Set([`${row}-${col}`]));
+    setGameStatus("playing");
+    setStartTime(Date.now()); // Reset timer
+    setTimeTaken(0);
+    solveTour(row, col);
   };
 
   const squares = Array(boardSize)
@@ -105,48 +135,56 @@ const Chessboard: FC = () => {
     .map((_, row) => Array(boardSize).fill(null).map((_, col) => ({ row, col })));
 
   return (
-    <div className="relative">
-      {isComputingSolution && (
-        <div className="absolute top-2 left-2 bg-white p-2 rounded shadow">
-          <p className="text-sm">Computing solution...</p>
-        </div>
-      )}
-      <div className="grid grid-cols-8 gap-0 w-[400px] h-[400px] border-2 border-gray-800 relative">
-        {squares.map((row, rowIndex) =>
-          row.map((square, colIndex) => {
-            const isVisited = visited.has(`${rowIndex}-${colIndex}`);
-            const isValidMove = getValidMoves().some(
-              (move) => move.row === rowIndex && move.col === colIndex
-            );
-            return (
-              <div
-                key={`${rowIndex}-${colIndex}`}
-                className={`w-[50px] h-[50px] ${
-                  gameStatus === "playing" ? "cursor-pointer" : "cursor-default"
-                } relative ${
-                  isVisited
-                    ? "bg-green-200"
-                    : isValidMove
-                    ? "bg-yellow-200"
-                    : (rowIndex + colIndex) % 2 === 0
-                    ? "bg-white"
-                    : "bg-gray-400"
-                }`}
-                onClick={() => handleSquareClick(rowIndex, colIndex)}
-              >
-                {isVisited && (
-                  <span className="absolute top-0 left-1 text-xs text-black">
-                    {visited.size -
-                      [...visited].indexOf(`${rowIndex}-${colIndex}`)}
-                  </span>
-                )}
-              </div>
-            );
-          })
+    <div className="flex flex-col items-center gap-4">
+      <AlgorithmSelector algorithm={algorithm} setAlgorithm={setAlgorithm} />
+      <div className="relative">
+        {isComputingSolution && (
+          <div className="absolute top-2 left-2 bg-white p-2 rounded shadow">
+            <p className="text-sm">Computing solution ({algorithm})...</p>
+          </div>
         )}
-        <Knight position={knightPosition} />
+        <div className="grid grid-cols-8 gap-0 w-[400px] h-[400px] border-2 border-gray-800 relative">
+          {squares.map((row, rowIndex) =>
+            row.map((square, colIndex) => {
+              const isVisited = visited.has(`${rowIndex}-${colIndex}`);
+              const isValidMove = getValidMoves().some(
+                (move) => move.row === rowIndex && move.col === colIndex
+              );
+              return (
+                <div
+                  key={`${rowIndex}-${colIndex}`}
+                  className={`w-[50px] h-[50px] ${
+                    gameStatus === "playing" ? "cursor-pointer" : "cursor-default"
+                  } relative ${
+                    isVisited
+                      ? "bg-green-200"
+                      : isValidMove
+                      ? "bg-yellow-200"
+                      : (rowIndex + colIndex) % 2 === 0
+                      ? "bg-white"
+                      : "bg-gray-400"
+                  }`}
+                  onClick={() => handleSquareClick(rowIndex, colIndex)}
+                >
+                  {isVisited && (
+                    <span className="absolute top-0 left-1 text-xs text-black">
+                      {[...visited].indexOf(`${rowIndex}-${colIndex}`) + 1}
+                    </span>
+                  )}
+                </div>
+              );
+            })
+          )}
+          <Knight position={knightPosition} />
+        </div>
+        <GameStatus status={gameStatus} timeTaken={timeTaken} />
+        <button
+          onClick={resetGame}
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          New Game
+        </button>
       </div>
-      <GameStatus status={gameStatus} timeTaken={timeTaken} />
     </div>
   );
 };

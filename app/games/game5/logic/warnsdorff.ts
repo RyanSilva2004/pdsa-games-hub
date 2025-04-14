@@ -1,70 +1,71 @@
-export const solveKnightsTourWarnsdorff = (
-    startRow: number,
-    startCol: number,
-    boardSize: number = 8
-  ): number[][] | null => {
-    const board = Array(boardSize)
-      .fill(null)
-      .map(() => Array(boardSize).fill(-1));
-    const moves = [
-      [2, 1],
-      [1, 2],
-      [-1, 2],
-      [-2, 1],
-      [-2, -1],
-      [-1, -2],
-      [1, -2],
-      [2, -1],
-    ];
-  
-    board[startRow][startCol] = 0;
-  
-    const getDegree = (row: number, col: number): number => {
-      let count = 0;
-      for (const [dr, dc] of moves) {
-        const nextRow = row + dr;
-        const nextCol = col + dc;
-        if (
-          nextRow >= 0 &&
-          nextRow < boardSize &&
-          nextCol >= 0 &&
-          nextCol < boardSize &&
-          board[nextRow][nextCol] === -1
-        ) {
-          count++;
-        }
+
+export const solveKnightsTourWarnsdorff = async (
+  startRow: number,
+  startCol: number,
+  boardSize: number
+): Promise<number[][] | null> => {
+  const board = Array(boardSize)
+    .fill(null)
+    .map(() => Array(boardSize).fill(-1));
+  board[startRow][startCol] = 0;
+
+  const moves = [
+    [2, 1],
+    [1, 2],
+    [-1, 2],
+    [-2, 1],
+    [-2, -1],
+    [-1, -2],
+    [1, -2],
+    [2, -1],
+  ];
+
+  const getDegree = (row: number, col: number): number => {
+    let count = 0;
+    for (const [dr, dc] of moves) {
+      const newRow = row + dr;
+      const newCol = col + dc;
+      if (
+        newRow >= 0 &&
+        newRow < boardSize &&
+        newCol >= 0 &&
+        newCol < boardSize &&
+        board[newRow][newCol] === -1
+      ) {
+        count++;
       }
-      return count;
-    };
-  
-    let row = startRow;
-    let col = startCol;
-    for (let move = 1; move < boardSize * boardSize; move++) {
-      const nextMoves: [number, number, number][] = [];
-      for (const [dr, dc] of moves) {
-        const nextRow = row + dr;
-        const nextCol = col + dc;
-        if (
-          nextRow >= 0 &&
-          nextRow < boardSize &&
-          nextCol >= 0 &&
-          nextCol < boardSize &&
-          board[nextRow][nextCol] === -1
-        ) {
-          nextMoves.push([nextRow, nextCol, getDegree(nextRow, nextCol)]);
-        }
-      }
-  
-      if (nextMoves.length === 0) {
-        return null;
-      }
-  
-      nextMoves.sort((a, b) => a[2] - b[2]);
-      const [nextRow, nextCol] = nextMoves[0];
-      board[nextRow][nextCol] = move;
-      row = nextRow;
-      col = nextCol;
     }
-  
-    return board;
+    return count;
   };
+
+  let row = startRow;
+  let col = startCol;
+  for (let move = 1; move < boardSize * boardSize; move++) {
+    const nextMoves = moves
+      .map(([dr, dc]) => ({ row: row + dr, col: col + dc }))
+      .filter(
+        ({ row, col }) =>
+          row >= 0 &&
+          row < boardSize &&
+          col >= 0 &&
+          col < boardSize &&
+          board[row][col] === -1
+      )
+      .map((move) => ({
+        ...move,
+        degree: getDegree(move.row, move.col),
+      }))
+      .sort((a, b) => a.degree - b.degree);
+
+    if (nextMoves.length === 0) {
+      return null;
+    }
+
+    const next = nextMoves[0];
+    board[next.row][next.col] = move;
+    row = next.row;
+    col = next.col;
+  }
+
+  return board;
+};
