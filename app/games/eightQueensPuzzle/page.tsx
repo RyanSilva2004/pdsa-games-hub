@@ -236,16 +236,22 @@ const EightQueensPuzzle = () => {
         new URL("./utils/workerThread", import.meta.url)
       );
 
+      const n = board.length;
+      worker.postMessage({ n });
+
       worker.onmessage = async (e) => {
         const workerResults: number[][] = e.data;
 
         const solutionStrings = workerResults.map((solution) =>
           solution.join(",")
         );
-
+        console.log("workerResults length:", workerResults.length);
+        console.log("Method passed to addGeneratedSolution:", method);
         try {
-          await addGeneratedSolution(solutionStrings, method, timeTaken);
-          console.log(`${method} solution saved to Firestore.`);
+          if (workerResults.length === 0) {
+            await addGeneratedSolution(solutionStrings, method, timeTaken);
+            console.log(`${method} solution saved to Firestore.`);
+          }
           resolve();
         } catch (error) {
           console.error(`Error saving ${method} solution:`, error);
