@@ -1,13 +1,14 @@
 "use client";
 
-import React, { Component } from "react";
+import React, { Component, useContext, useEffect, useState } from "react";
 import { PageHeader } from "@/shared/components/page-header";
 import QueenIcon from "@/public/icons/queen.icon";
 import Image from "next/image";
 import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
-
-type Props = {};
+import findAllNQueensSolutions from "./utils/eightQueensSolver";
+import { CommonContext } from "@/context/Common";
+import { createUser, createGuestUser } from "../../api/user";
 
 type ScoreEntry = {
   name: string;
@@ -22,300 +23,77 @@ type userGameSummary = {
   result: "win" | "lose" | null;
 };
 
-type State = {
-  board: number[][];
-  queenCount: number;
-  emptySlots: number;
-  isModalOpen: boolean;
-  gameMessage: string;
-  isGameStarted: boolean;
-  startTime: number | null;
-  elapsedTime: number;
-  isHelpModalOpen: boolean;
-  highestScores: ScoreEntry[];
-  playerName: string;
-  isNameModalOpen: boolean;
-  gameHistory: userGameSummary;
-};
-
 const BOARD_SIZE = 8;
 const MOVES_LIMIT = 8;
 
-export default class EightQueensPuzzle extends Component<Props, State> {
-  timerInterval: NodeJS.Timeout | null = null;
+const EightQueensPuzzle = () => {
+  const [playerName, setPlayerName] = useState<string>("");
+  const [board, setBoard] = useState<number[][]>(
+    Array.from({ length: 8 }, () => Array(8).fill(0))
+  );
+  const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>();
+  const [queenCount, setQueenCount] = useState<number>(0);
+  const { user } = useContext(CommonContext);
+  const [emptySlots, setEmptySlots] = useState<number>(BOARD_SIZE * BOARD_SIZE);
+  const [moves, setMoves] = useState<[][]>([]);
+  const [timeTaken, setTimeTaken] = useState<string>("");
+  const [result, setResult] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [gameMessage, setGameMessage] = useState("");
+  const [isGameStarted, setIsGameStarted] = useState(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [highestScores, setHighestScores] = useState([]);
+  const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+  const [solution, setSolution] = useState<string>("");
 
-  constructor(props: Props) {
-    super(props);
-    const board = Array.from({ length: 8 }, () => Array(8).fill(0));
+  useEffect(() => {
+    const worker = new Worker(new URL("./utils/workerThread", import.meta.url));
 
-    const gameHistory = {
-      playerName: "",
-      moves: board,
-      timeTaken: "",
-      result: null,
+    worker.onmessage = (e) => {
+      setSolution(e.data);
     };
-    this.state = {
-      board,
-      queenCount: 0,
-      emptySlots: BOARD_SIZE * BOARD_SIZE,
-      isModalOpen: false,
-      gameMessage: "",
-      isGameStarted: false,
-      startTime: null,
-      elapsedTime: 0,
-      isHelpModalOpen: false,
-      highestScores: [],
-      playerName: "",
-      isNameModalOpen: true,
-      gameHistory,
+
+    worker.postMessage(board);
+
+    return () => {
+      worker.terminate();
     };
-  }
+  }, [board]);
 
-  render() {
-    return (
-      <main className="container mx-auto px-4 py-8">
-        <PageHeader
-          title="Eight Queens Puzzle"
-          description="Place 8 queens on a chessboard without threats"
-        />
-        <div className="flex justify-center items-center mb-8">
-          <span className="text-lg font-semibold text-gray-700 me-4">
-            Time: {this.formatTime(this.state.elapsedTime)}
-          </span>
-          {!this.state.isGameStarted && (
-            <button
-              onClick={this.handleStartGame}
-              className="w-32 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Start Game
-            </button>
-          )}
-        </div>
+  const handleUser = async () => {
+    try {
+      let userId;
 
-        <div className="flex justify-center mt-8">
-          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-40 me-5 h-fit">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">
-              Toolbar
-            </h2>
+      // if (userData.userType === 'registered') {
+      //   userId = await createUser(userData);
+      // } else if (userData.userType === 'guest') {
+      userId = await createGuestUser();
+      // } else {
+      //   throw new Error('Invalid userType provided.');
+      // }
+    } catch (e) {
+      console.log("error : ", e);
+    }
+  };
 
-            <button
-              onClick={this.handleRestart}
-              className="w-full mb-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              disabled={!this.state.isGameStarted}
-            >
-              Reset
-            </button>
+  useEffect(() => {
+    setIsNameModalOpen(true);
+  }, []);
 
-            <button
-              onClick={() => this.setState({ isHelpModalOpen: true })}
-              className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-            >
-              Help
-            </button>
-          </div>
-          <div className="grid grid-cols-8 gap-2">
-            {this.state.board.map((row, rowIndex) =>
-              row.map((cell, colIndex) => {
-                let buttonColor = "bg-gray-200";
-                if (cell === 1) {
-                  buttonColor = "bg-[#03c300]";
-                } else if (cell === 2) {
-                  buttonColor = "bg-[#bff3c4]";
-                }
+  useEffect(() => {
+    handleUser();
+  }, []);
 
-                return (
-                  <button
-                    key={`${rowIndex}-${colIndex}`}
-                    className={`w-16 h-16 ${buttonColor} hover:bg-opacity-80 rounded-lg flex items-center justify-center`}
-                    onClick={() => this.handleClick(rowIndex, colIndex)}
-                    disabled={
-                      !this.state.isGameStarted || cell === 1 || cell === 2
-                    }
-                  >
-                    {cell === 1 ? (
-                      <QueenIcon size={25} color="#ffffff" />
-                    ) : null}
-                  </button>
-                );
-              })
-            )}
-          </div>
-          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
-            <div className="text-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">
-                Game Scoreboard
-              </h2>
-            </div>
-
-            <div className="mb-4 w-full">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Remaining Moves:</span>
-                <span className="font-semibold text-blue-600">
-                  {MOVES_LIMIT - this.state.queenCount}
-                </span>
-              </div>
-            </div>
-
-            <div className="mb-4 w-full">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">
-                  Total Empty Slots:
-                </span>
-                <span className="font-semibold text-red-600">
-                  {this.countEmptySlots()}
-                </span>
-              </div>
-            </div>
-
-            <div className="w-full mb-6">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Value:</span>
-                <span className="font-semibold text-green-600">2</span>
-              </div>
-            </div>
-
-            <div className="w-full border-t pt-4 mt-2">
-              <h3 className="text-md font-semibold text-gray-700 mb-2">
-                Top 10 Scores
-              </h3>
-              {this.state.highestScores &&
-              this.state.highestScores.length > 0 ? (
-                <div className="space-y-2">
-                  {this.state.highestScores.slice(0, 10).map((score, index) => (
-                    <div
-                      key={index}
-                      className="flex justify-between text-sm text-gray-700"
-                    >
-                      <span className="w-1/3 truncate">{score.name}</span>
-                      <span className="w-1/3 text-center">{score.time}s</span>
-                      <span className="w-1/3 text-right">{score.date}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500 italic">
-                  No scores recorded yet
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {this.state.isNameModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">
-                Enter Your Name
-              </h3>
-              <input
-                type="text"
-                value={this.state.playerName}
-                onChange={(e) => this.setState({ playerName: e.target.value })}
-                placeholder="Your name"
-                className="w-full px-4 py-2 mb-4 border rounded"
-              />
-              <button
-                className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-                onClick={() => this.setState({ isNameModalOpen: false })}
-                disabled={this.state.playerName.trim() === ""}
-              >
-                Start
-              </button>
-            </div>
-          </div>
-        )}
-
-        {this.state.isHelpModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">
-                How to Play
-              </h3>
-              <p className="text-sm text-gray-600 mb-6 text-left">
-                The objective of the Eight Queens Puzzle is to place eight
-                queens on a standard 8×8 chessboard so that no two queens
-                threaten each other.
-                <br />
-                <br />
-                A queen can move any number of squares vertically, horizontally,
-                or diagonally.
-                <br />
-                <br />
-                Your task is to place each queen on the board so that none of
-                them share the same row, column, or diagonal.
-                <br />
-                <br />
-                You win when all 8 queens are placed without conflict.
-              </p>
-              <button
-                onClick={() => this.setState({ isHelpModalOpen: false })}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
-
-        {this.state.isModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center">
-              {this.state.gameMessage === "You won!" && (
-                <div className="mb-4 flex justify-center">
-                  <Image
-                    src={WinImage}
-                    alt="You Won"
-                    width={100}
-                    height={100}
-                    className="mx-auto"
-                  />
-                </div>
-              )}
-              {this.state.gameMessage ===
-                "Game over! You are out of moves." && (
-                <div className="mb-4 flex justify-center">
-                  <Image
-                    src={LostImage}
-                    alt="You Won"
-                    width={100}
-                    height={100}
-                    className="mx-auto"
-                  />
-                </div>
-              )}
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">
-                {this.state.gameMessage} - Time:{" "}
-                {this.formatTime(this.state.elapsedTime)}
-              </h3>
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={this.handleRestart}
-                  className="px-4 py-2 bg-green-500 text-white rounded-md"
-                >
-                  Restart
-                </button>
-                <button
-                  onClick={this.handleCancel}
-                  className="px-4 py-2 bg-red-500 text-white rounded-md"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    );
-  }
-
-  formatTime(timeInSeconds: number) {
+  const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
     const seconds = timeInSeconds % 60;
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-  }
+  };
 
-  handleClick(rowIndex: number, colIndex: number) {
-    const updatedBoard = this.findAllPossibleMoves(rowIndex, colIndex);
+  const handleClick = (rowIndex: number, colIndex: number) => {
+    const updatedBoard = findAllPossibleMoves(rowIndex, colIndex);
 
     let emptySlotCount = 0;
     updatedBoard.forEach((row) => {
@@ -323,22 +101,19 @@ export default class EightQueensPuzzle extends Component<Props, State> {
         if (cell === 0) emptySlotCount++;
       });
     });
+    setBoard(updatedBoard);
+    setQueenCount(queenCount + 1);
 
-    this.setState(
-      (prev) => ({
-        board: updatedBoard,
-        queenCount: prev.queenCount + 1,
-      }),
-      () => {
-        if (this.state.queenCount === MOVES_LIMIT || emptySlotCount === 0) {
-          this.gameOver(this.state.queenCount, emptySlotCount);
-        }
-      }
-    );
-  }
+    if (queenCount === MOVES_LIMIT || emptySlotCount === 0) {
+      gameOver(queenCount, emptySlotCount);
+    }
+  };
 
-  findAllPossibleMoves(rowIndex: number, colIndex: number): number[][] {
-    const newBoard = this.state.board.map((row) => [...row]);
+  const findAllPossibleMoves = (
+    rowIndex: number,
+    colIndex: number
+  ): number[][] => {
+    const newBoard = board.map((row) => [...row]);
     const boardSize = newBoard.length;
 
     for (let i = 0; i < boardSize; i++) {
@@ -359,11 +134,11 @@ export default class EightQueensPuzzle extends Component<Props, State> {
 
     newBoard[rowIndex][colIndex] = 1;
     return newBoard;
-  }
+  };
 
-  countEmptySlots = () => {
+  const countEmptySlots = () => {
     let emptySlotCount = 0;
-    this.state.board.forEach((row) => {
+    board.forEach((row) => {
       row.forEach((cell) => {
         if (cell === 0) emptySlotCount++;
       });
@@ -371,77 +146,323 @@ export default class EightQueensPuzzle extends Component<Props, State> {
     return emptySlotCount;
   };
 
-  gameOver = (moves: number, emptySlotsCount: number) => {
-    console.log("game over");
+  const gameOver = (moves: number, emptySlotsCount: number) => {
+    console.log("queenCount : ", queenCount);
 
-    if (this.state.queenCount === BOARD_SIZE) {
-      this.setState({
-        isModalOpen: true,
-        gameMessage: "You won!",
-      });
+    if (queenCount + 1 === BOARD_SIZE) {
+      setIsModalOpen(true);
+      setGameMessage("You won!");
     } else {
-      this.setState({
-        isModalOpen: true,
-        gameMessage: "Game over! You are out of moves.",
-      });
+      setIsModalOpen(true);
+      setGameMessage("Game over! You are out of moves.");
     }
 
-    this.updateUserGameHistory({
-      playerName: this.state.playerName,
-      moves: this.state.board,
-      timeTaken: this.state.elapsedTime.toString(),
-      result: this.state.gameMessage.includes("won") ? "win" : "lose",
-    });
-
-    if (this.timerInterval) clearInterval(this.timerInterval);
-  };
-
-  handleRestart = () => {
-    const board = Array.from({ length: 8 }, () => Array(8).fill(0));
-    this.setState({
+    updateUserGameHistory({
+      playerName,
       board,
-      queenCount: 0,
-      emptySlots: BOARD_SIZE * BOARD_SIZE,
-      isModalOpen: false,
-      isGameStarted: false,
-      startTime: null,
-      elapsedTime: 0,
+      elapsedTime,
+      gameMessage,
     });
-    if (this.timerInterval) clearInterval(this.timerInterval);
+
+    if (timerInterval) clearInterval(timerInterval);
   };
 
-  handleCancel = () => {
-    this.setState({
-      isModalOpen: false,
-    });
+  const handleRestart = () => {
+    const board = Array.from({ length: 8 }, () => Array(8).fill(0));
+    setBoard(board);
+    setQueenCount(0);
+    setEmptySlots(BOARD_SIZE * BOARD_SIZE);
+    setIsModalOpen(false);
+    setIsGameStarted(false);
+    setStartTime(null);
+    setElapsedTime(0);
+    if (timerInterval) clearInterval(timerInterval);
   };
 
-  handleStartGame = () => {
-    this.setState({
-      isGameStarted: true,
-      startTime: Date.now(),
-    });
+  const handleCancel = () => {
+    setIsModalOpen(false);
+  };
 
-    this.timerInterval = setInterval(() => {
-      this.setState((prevState) => ({
-        elapsedTime: Math.floor(
-          (Date.now() - (prevState.startTime ?? 0)) / 1000
-        ),
-      }));
+  const handleStartGame = () => {
+    setIsGameStarted(true);
+    const start = Date.now();
+    setStartTime(start);
+
+    const interval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - start) / 1000));
     }, 1000);
+
+    setTimerInterval(interval);
   };
 
-  updateUserGameHistory = (data: userGameSummary) => {
+  const updateUserGameHistory = (data: userGameSummary) => {
     console.log("game history data : ", data);
   };
 
-  sendGameDataToServer = async () => {
-    if (this.state.gameHistory) {
+  const sendGameDataToServer = async () => {
+    const gameData: userGameSummary = {
+      playerName,
+      moves: board,
+      timeTaken: elapsedTime.toString(),
+      result: gameMessage.includes("won") ? "win" : "lose",
+    };
+
+    try {
       await fetch("/api/save-game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(this.state.gameHistory),
+        body: JSON.stringify(gameData),
       });
+    } catch (error) {
+      console.error("Error saving game data:", error);
     }
   };
-}
+
+  useEffect(() => {
+    return () => {
+      if (timerInterval) clearInterval(timerInterval);
+    };
+  }, [timerInterval]);
+
+  useEffect(() => {
+    console.log("results ", findAllNQueensSolutions(BOARD_SIZE));
+  }, []);
+
+  return (
+    <main className="container mx-auto px-4 py-8">
+      <PageHeader
+        title="Eight Queens Puzzle"
+        description="Place 8 queens on a chessboard without threats"
+      />
+      <div className="flex justify-center items-center mb-8">
+        <span className="text-lg font-semibold text-gray-700 me-4">
+          Time: {formatTime(elapsedTime)}
+        </span>
+        {!isGameStarted && (
+          <button
+            onClick={handleStartGame}
+            className="w-32 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Start Game
+          </button>
+        )}
+      </div>
+
+      <div className="flex justify-center mt-8">
+        <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-40 me-5 h-fit">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Toolbar</h2>
+
+          <button
+            onClick={handleRestart}
+            className="w-full mb-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            disabled={!isGameStarted}
+          >
+            Reset
+          </button>
+
+          <button
+            onClick={() => {
+              setIsHelpModalOpen(true);
+            }}
+            className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+          >
+            Help
+          </button>
+          <button
+            onClick={() => {
+              console.log("clicked hint");
+            }}
+            className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 mt-2"
+          >
+            Hint
+          </button>
+        </div>
+        <div className="grid grid-cols-8 gap-2">
+          {board.map((row, rowIndex) =>
+            row.map((cell, colIndex) => {
+              let buttonColor = "bg-gray-200";
+              if (cell === 1) {
+                buttonColor = "bg-[#03c300]";
+              } else if (cell === 2) {
+                buttonColor = "bg-[#bff3c4]";
+              }
+
+              return (
+                <button
+                  key={`${rowIndex}-${colIndex}`}
+                  className={`w-16 h-16 ${buttonColor} hover:bg-opacity-80 rounded-lg flex items-center justify-center`}
+                  onClick={() => handleClick(rowIndex, colIndex)}
+                  disabled={!isGameStarted || cell === 1 || cell === 2}
+                >
+                  {cell === 1 ? <QueenIcon size={25} color="#ffffff" /> : null}
+                </button>
+              );
+            })
+          )}
+        </div>
+        <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-gray-800">Game Scoreboard</h2>
+          </div>
+
+          <div className="mb-4 w-full">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Remaining Moves:</span>
+              <span className="font-semibold text-blue-600">
+                {MOVES_LIMIT - queenCount}
+              </span>
+            </div>
+          </div>
+
+          <div className="mb-4 w-full">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Total Empty Slots:</span>
+              <span className="font-semibold text-red-600">
+                {countEmptySlots()}
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full mb-6">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Value:</span>
+              <span className="font-semibold text-green-600">2</span>
+            </div>
+          </div>
+
+          <div className="w-full border-t pt-4 mt-2">
+            <h3 className="text-md font-semibold text-gray-700 mb-2">
+              Top 10 Scores
+            </h3>
+            {highestScores && highestScores.length > 0 ? (
+              <div className="space-y-2">
+                {highestScores
+                  .slice(0, 10)
+                  .map((score: ScoreEntry, index: number) => (
+                    <div
+                      key={index}
+                      className="flex justify-between text-sm text-gray-700"
+                    >
+                      <span className="w-1/3 truncate">{score.name}</span>
+                      <span className="w-1/3 text-center">{score.time}s</span>
+                      <span className="w-1/3 text-right">{score.date}</span>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 italic">
+                No scores recorded yet
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {isNameModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              Enter Your Name
+            </h3>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="Your name"
+              className="w-full px-4 py-2 mb-4 border rounded"
+            />
+            <button
+              className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+              onClick={() => setIsNameModalOpen(false)}
+              disabled={playerName.trim() === ""}
+            >
+              Start
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isHelpModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              How to Play
+            </h3>
+            <p className="text-sm text-gray-600 mb-6 text-left">
+              The objective of the Eight Queens Puzzle is to place eight queens
+              on a standard 8×8 chessboard so that no two queens threaten each
+              other.
+              <br />
+              <br />
+              A queen can move any number of squares vertically, horizontally,
+              or diagonally.
+              <br />
+              <br />
+              Your task is to place each queen on the board so that none of them
+              share the same row, column, or diagonal.
+              <br />
+              <br />
+              You win when all 8 queens are placed without conflict.
+            </p>
+            <button
+              onClick={() => {
+                setIsHelpModalOpen(false);
+              }}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center">
+            {gameMessage === "You won!" && (
+              <div className="mb-4 flex justify-center">
+                <Image
+                  src={WinImage}
+                  alt="You Won"
+                  width={100}
+                  height={100}
+                  className="mx-auto"
+                />
+              </div>
+            )}
+            {gameMessage === "Game over! You are out of moves." && (
+              <div className="mb-4 flex justify-center">
+                <Image
+                  src={LostImage}
+                  alt="You Won"
+                  width={100}
+                  height={100}
+                  className="mx-auto"
+                />
+              </div>
+            )}
+            <h3 className="text-2xl font-bold text-gray-800 mb-4">
+              {gameMessage} - Time: {formatTime(elapsedTime)}
+            </h3>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={handleRestart}
+                className="px-4 py-2 bg-green-500 text-white rounded-md"
+              >
+                Restart
+              </button>
+              <button
+                onClick={handleCancel}
+                className="px-4 py-2 bg-red-500 text-white rounded-md"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+};
+
+export default EightQueensPuzzle;
