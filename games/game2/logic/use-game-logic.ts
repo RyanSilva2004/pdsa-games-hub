@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import type { City } from "./types"
+import { useState, useCallback } from "react"
+import type { City, GameState } from "./types"
+import { GamePhase } from "./types"
+import { AdjacencyMatrix } from "./adjacency-matrix"
 
 // Define all possible cities
 const allCities: City[] = [
@@ -17,38 +19,234 @@ const allCities: City[] = [
   { id: "J", name: "City J" },
 ]
 
+const initialGameState: GameState = {
+  currentRoute: [],
+  startCity: null,
+  totalDistance: 0,
+  isComplete: false,
+}
+
 export function useGameLogic() {
-  const [cities, setCities] = useState<City[]>(allCities)
-  const [distanceMatrix, setDistanceMatrix] = useState<Record<string, Record<string, number>>>({})
+  // Game phase tracking
+  const [gamePhase, setGamePhase] = useState<GamePhase>(GamePhase.SETUP)
 
-  // Generate a map with random distances between cities
-  const generateCityMap = () => {
-    // Generate random distances between cities (50-100 km)
-    const newDistanceMatrix: Record<string, Record<string, number>> = {}
+  // City management
+  const [availableCities, setAvailableCities] = useState<City[]>([])
+  const [selectedCities, setSelectedCities] = useState<City[]>([])
 
-    cities.forEach((city1) => {
-      newDistanceMatrix[city1.id] = {}
+  // Adjacency matrix
+  const [adjacencyMatrix, setAdjacencyMatrix] = useState<AdjacencyMatrix | null>(null)
 
-      cities.forEach((city2) => {
-        if (city1.id === city2.id) {
-          newDistanceMatrix[city1.id][city2.id] = 0
-        } else if (newDistanceMatrix[city2.id]?.[city1.id] !== undefined) {
-          // Use the same distance for both directions
-          newDistanceMatrix[city1.id][city2.id] = newDistanceMatrix[city2.id][city1.id]
-        } else {
-          // Generate a random distance between 50 and 100
-          const distance = Math.floor(Math.random() * 51) + 50
-          newDistanceMatrix[city1.id][city2.id] = distance
+  // Game state
+  const [gameState, setGameState] = useState<GameState>(initialGameState)
+  const [optimalRoute, setOptimalRoute] = useState<{ route: string[]; distance: number } | null>(null)
+
+  // Map visualization state
+  const [isMapReady, setIsMapReady] = useState(false)
+
+  // Add a state variable for forcing a new game
+  const [forceNewGame, setForceNewGame] = useState(false)
+
+  // Reset the game state
+  const resetGame = useCallback(() => {
+    setGameState(initialGameState)
+    setOptimalRoute(null)
+  }, [])
+
+  // Initialize available cities based on count and create the map
+  const initializeGame = useCallback(
+    (cityCount: number) => {
+      // Only initialize if we're in the setup phase or explicitly starting a new game
+      if (gamePhase !== GamePhase.SETUP && !forceNewGame) return
+
+      // Reset the force new game flag
+      setForceNewGame(false)
+
+      // Get the first N cities from the all cities list
+      const cities = allCities.slice(0, cityCount).map((city) => ({
+        ...city,
+        selected: false,
+      }))
+
+      setAvailableCities(cities)
+      setSelectedCities([])
+
+      // Create a new adjacency matrix
+      const cityIds = cities.map((city) => city.id)
+      const matrix = new AdjacencyMatrix(cityIds)
+      setAdjacencyMatrix(matrix)
+
+      // Move to map visualization phase
+      setGamePhase(GamePhase.MAP_VISUALIZATION)
+      setIsMapReady(false)
+
+      // Reset game state
+      resetGame()
+    },
+    [gamePhase, forceNewGame, resetGame],
+  )
+
+  // Called when the map visualization is complete
+  const onMapVisualizationComplete = useCallback(() => {
+    setIsMapReady(true)
+  }, [])
+
+  // Move to city selection phase after map is visualized
+  const startCitySelection = useCallback(() => {
+    if (isMapReady) {
+      setGamePhase(GamePhase.CITY_SELECTION)
+    }
+  }, [isMapReady])
+
+  // Toggle city selection
+  const toggleCitySelection = useCallback(
+    (cityId: string) => {
+      if (gamePhase !== GamePhase.CITY_SELECTION) return
+
+      setAvailableCities((prev) =>
+        prev.map((city) => (city.id === cityId ? { ...city, selected: !city.selected } : city)),
+      )
+    },
+    [gamePhase],
+  )
+
+  // Confirm city selection
+  const confirmCitySelection = useCallback(() => {
+    const selected = availableCities.filter((city) => city.selected)
+
+    // Ensure at least 3 cities are selected
+    if (selected.length < 3) {
+      return false
+    }
+
+    setSelectedCities(selected)
+
+    // Create a new adjacency matrix with only the selected cities
+    const cityIds = selected.map((city) => city.id)
+    const matrix = new AdjacencyMatrix(cityIds)
+    setAdjacencyMatrix(matrix)
+
+    // For now, we just save the selection
+    // In the future, we would move to route planning phase
+    // setGamePhase(GamePhase.ROUTE_PLANNING)
+
+    return true
+  }, [availableCities])
+
+  // Select a city to add to the route (for future route planning phase)
+  const selectCity = useCallback(
+    (cityId: string) => {
+      if (gamePhase !== GamePhase.ROUTE_PLANNING || !adjacencyMatrix || gameState.isComplete) return
+
+      // If this is the first city, set it as the start city
+      if (gameState.currentRoute.length === 0) {
+        setGameState({
+          ...gameState,
+          currentRoute: [cityId],
+          startCity: cityId,
+          totalDistance: 0,
+        })
+        return
+      }
+
+      // If the city is already in the route, do nothing
+      if (gameState.currentRoute.includes(cityId)) {
+        // Unless it's the start city and we've visited all other cities
+        if (cityId === gameState.startCity && gameState.currentRoute.length === selectedCities.length) {
+          const lastCity = gameState.currentRoute[gameState.currentRoute.length - 1]
+          const newDistance = gameState.totalDistance + adjacencyMatrix.getDistance(lastCity, cityId)
+
+          setGameState({
+            ...gameState,
+            currentRoute: [...gameState.currentRoute, cityId],
+            totalDistance: newDistance,
+            isComplete: true,
+          })
+
+          // Move to completed phase
+          setGamePhase(GamePhase.COMPLETED)
         }
-      })
-    })
+        return
+      }
 
-    setDistanceMatrix(newDistanceMatrix)
-  }
+      // Add the city to the route
+      const lastCity = gameState.currentRoute[gameState.currentRoute.length - 1]
+      const newRoute = [...gameState.currentRoute, cityId]
+      const newDistance = gameState.totalDistance + adjacencyMatrix.getDistance(lastCity, cityId)
+
+      setGameState({
+        ...gameState,
+        currentRoute: newRoute,
+        totalDistance: newDistance,
+        isComplete: false,
+      })
+    },
+    [gamePhase, adjacencyMatrix, gameState, selectedCities],
+  )
+
+  // Calculate the optimal route (for future use)
+  const calculateOptimalRoute = useCallback(() => {
+    if (!adjacencyMatrix || !gameState.startCity) return null
+
+    const cityIds = adjacencyMatrix.getCityIds()
+
+    // Use nearest neighbor algorithm for simplicity
+    const startCity = gameState.startCity
+    const unvisited = cityIds.filter((id) => id !== startCity)
+    const route = [startCity]
+    let currentCity = startCity
+    let totalDistance = 0
+
+    while (unvisited.length > 0) {
+      // Find the nearest unvisited city
+      let nearestCity = unvisited[0]
+      let minDistance = adjacencyMatrix.getDistance(currentCity, nearestCity)
+
+      for (let i = 1; i < unvisited.length; i++) {
+        const city = unvisited[i]
+        const distance = adjacencyMatrix.getDistance(currentCity, city)
+        if (distance < minDistance) {
+          nearestCity = city
+          minDistance = distance
+        }
+      }
+
+      // Add the nearest city to the route
+      route.push(nearestCity)
+      totalDistance += minDistance
+      currentCity = nearestCity
+      unvisited.splice(unvisited.indexOf(nearestCity), 1)
+    }
+
+    // Add the return to start
+    totalDistance += adjacencyMatrix.getDistance(currentCity, startCity)
+    route.push(startCity)
+
+    setOptimalRoute({ route, distance: totalDistance })
+    return { route, distance: totalDistance }
+  }, [adjacencyMatrix, gameState.startCity])
+
+  // Force start a new game
+  const forceStartNewGame = useCallback(() => {
+    setForceNewGame(true)
+  }, [])
 
   return {
-    cities,
-    distanceMatrix,
-    generateCityMap,
+    gamePhase,
+    availableCities,
+    selectedCities,
+    adjacencyMatrix,
+    gameState,
+    optimalRoute,
+    isMapReady,
+    initializeGame,
+    onMapVisualizationComplete,
+    startCitySelection,
+    toggleCitySelection,
+    confirmCitySelection,
+    selectCity,
+    resetGame,
+    calculateOptimalRoute,
+    forceStartNewGame,
   }
 }
