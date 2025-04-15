@@ -1,12 +1,13 @@
 "use client";
 
-import React, { Component, useEffect, useState } from "react";
+import React, { Component, useContext, useEffect, useState } from "react";
 import { PageHeader } from "@/shared/components/page-header";
 import QueenIcon from "@/public/icons/queen.icon";
 import Image from "next/image";
 import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
 import findAllNQueensSolutions from "./utils/eightQueensSolver";
+import { CommonContext } from "@/context/Common";
 
 type ScoreEntry = {
   name: string;
@@ -31,7 +32,8 @@ const EightQueensPuzzle = () => {
   );
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>();
   const [queenCount, setQueenCount] = useState<number>(0);
-
+  const { user } = useContext(CommonContext);
+  console.log("user from context : ", user);
   const [emptySlots, setEmptySlots] = useState<number>(BOARD_SIZE * BOARD_SIZE);
   const [moves, setMoves] = useState<[][]>([]);
   const [timeTaken, setTimeTaken] = useState<string>("");
