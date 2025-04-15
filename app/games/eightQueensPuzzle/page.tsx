@@ -62,21 +62,21 @@ const EightQueensPuzzle = () => {
     };
   }, [board]);
 
-  // const handleUser = async () => {
-  //   try {
-  //     let userId;
+  const handleUser = async () => {
+    try {
+      let userId;
 
-  //     // if (userData.userType === 'registered') {
-  //     //   userId = await createUser(userData);
-  //     // } else if (userData.userType === 'guest') {
-  //     userId = await createGuestUser();
-  //     // } else {
-  //     //   throw new Error('Invalid userType provided.');
-  //     // }
-  //   } catch (e) {
-  //     console.log("error : ", e);
-  //   }
-  // };
+      // if (userData.userType === 'registered') {
+      //   userId = await createUser(userData);
+      // } else if (userData.userType === 'guest') {
+      userId = await createGuestUser();
+      // } else {
+      //   throw new Error('Invalid userType provided.');
+      // }
+    } catch (e) {
+      console.log("error : ", e);
+    }
+  };
 
   useEffect(() => {
     setIsNameModalOpen(true);
