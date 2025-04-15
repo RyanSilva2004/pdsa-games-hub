@@ -16,6 +16,7 @@ export const addGeneratedSolution = async (
   method: "sequential" | "threaded" | "comparison",
   timeTaken: number
 ) => {
+  console.log("Saving to Firestore:", { solution, method, timeTaken });
   const ref = collection(db, "solutions");
   const docRef = await addDoc(ref, {
     solution,
