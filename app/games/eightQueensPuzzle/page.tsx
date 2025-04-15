@@ -8,6 +8,7 @@ import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
 import findAllNQueensSolutions from "./utils/eightQueensSolver";
 import { CommonContext } from "@/context/Common";
+import { createUser, createGuestUser } from "../../api/user";
 
 type ScoreEntry = {
   name: string;
@@ -33,7 +34,6 @@ const EightQueensPuzzle = () => {
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>();
   const [queenCount, setQueenCount] = useState<number>(0);
   const { user } = useContext(CommonContext);
-  console.log("user from context : ", user);
   const [emptySlots, setEmptySlots] = useState<number>(BOARD_SIZE * BOARD_SIZE);
   const [moves, setMoves] = useState<[][]>([]);
   const [timeTaken, setTimeTaken] = useState<string>("");
@@ -62,8 +62,28 @@ const EightQueensPuzzle = () => {
     };
   }, [board]);
 
+  // const handleUser = async () => {
+  //   try {
+  //     let userId;
+
+  //     // if (userData.userType === 'registered') {
+  //     //   userId = await createUser(userData);
+  //     // } else if (userData.userType === 'guest') {
+  //     userId = await createGuestUser();
+  //     // } else {
+  //     //   throw new Error('Invalid userType provided.');
+  //     // }
+  //   } catch (e) {
+  //     console.log("error : ", e);
+  //   }
+  // };
+
   useEffect(() => {
     setIsNameModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    handleUser();
   }, []);
 
   const formatTime = (timeInSeconds: number) => {
