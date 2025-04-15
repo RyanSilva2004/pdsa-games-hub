@@ -46,6 +46,21 @@ const EightQueensPuzzle = () => {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [highestScores, setHighestScores] = useState([]);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+  const [solution, setSolution] = useState<string>("");
+
+  useEffect(() => {
+    const worker = new Worker(new URL("./utils/workerThread", import.meta.url));
+
+    worker.onmessage = (e) => {
+      setSolution(e.data);
+    };
+
+    worker.postMessage(board);
+
+    return () => {
+      worker.terminate();
+    };
+  }, [board]);
 
   useEffect(() => {
     setIsNameModalOpen(true);
@@ -232,6 +247,14 @@ const EightQueensPuzzle = () => {
             className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
           >
             Help
+          </button>
+          <button
+            onClick={() => {
+              console.log("clicked hint");
+            }}
+            className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 mt-2"
+          >
+            Hint
           </button>
         </div>
         <div className="grid grid-cols-8 gap-2">
