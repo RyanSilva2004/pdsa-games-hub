@@ -8,20 +8,54 @@ interface GameResult {
   moves: { row: number; col: number }[];
   algorithm: "backtracking" | "warnsdorff";
   timestamp: Date;
-  
+  boardSize: number;
 }
 
+const validateGameResult = (result: GameResult): string | null => {
+  if (!result.playerName || result.playerName.length > 20) {
+    return "Invalid player name";
+  }
+  
+  if (!["win", "loss"].includes(result.status)) {
+    return "Invalid game status";
+  }
+  
+  if (typeof result.timeTaken !== "number" || result.timeTaken < 0) {
+    return "Invalid time taken";
+  }
+  
+  if (!Array.isArray(result.moves)) {
+    return "Invalid moves data";
+  }
+  
+  if (!["backtracking", "warnsdorff"].includes(result.algorithm)) {
+    return "Invalid algorithm";
+  }
+  
+  if (typeof result.boardSize !== "number" || result.boardSize <= 0) {
+    return "Invalid board size";
+  }
+  
+  return null;
+};
+
 const saveGameResult = async (gameResult: GameResult) => {
+  const validationError = validateGameResult(gameResult);
+  if (validationError) {
+    console.error("Validation failed:", validationError);
+    throw new Error(validationError);
+  }
+
   try {
     const docRef = await addDoc(collection(firestore, "gameResults"), {
       ...gameResult,
-      
+      timestamp: new Date(),
     });
     console.log("Game result saved with ID: ", docRef.id);
     return true;
   } catch (e) {
     console.error("Error adding document: ", e);
-    return false;
+    throw new Error("Failed to save game result to database");
   }
 };
 
