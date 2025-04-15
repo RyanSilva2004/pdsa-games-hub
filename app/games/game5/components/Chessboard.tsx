@@ -1,3 +1,4 @@
+// components/Chessboard.tsx
 "use client";
 import { FC, useState, useEffect, useMemo } from "react";
 import Knight from "./Knight";
@@ -6,11 +7,18 @@ import AlgorithmSelector from "./AlgorithmSelector";
 import { isValidKnightMove } from "../util/utils";
 import { solveKnightsTourBacktracking } from "../logic/backtracking";
 import { solveKnightsTourWarnsdorff } from "../logic/warnsdorff";
+import { saveGameResult } from "../util/gameService";
+import { useRouter } from "next/navigation";
 
-const Chessboard: FC = () => {
+interface ChessboardProps {
+  playerName: string;
+}
+
+const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
   const boardSize = 8;
   const [knightPosition, setKnightPosition] = useState({ row: 0, col: 0 });
   const [visited, setVisited] = useState<Set<string>>(new Set());
+  const [visitedOrder, setVisitedOrder] = useState<{row: number, col: number}[]>([]);
   const [solution, setSolution] = useState<number[][] | null>(null);
   const [isComputingSolution, setIsComputingSolution] = useState(false);
   const [startTime, setStartTime] = useState<number>(Date.now());
@@ -21,6 +29,7 @@ const Chessboard: FC = () => {
   const [algorithm, setAlgorithm] = useState<"backtracking" | "warnsdorff">(
     "backtracking"
   );
+  const router = useRouter();
 
   // Function to solve the knight's tour based on selected algorithm
   const solveTour = async (row: number, col: number) => {
@@ -52,8 +61,11 @@ const Chessboard: FC = () => {
     const row = Math.floor(Math.random() * boardSize);
     const col = Math.floor(Math.random() * boardSize);
     setKnightPosition({ row, col });
-    setVisited(new Set([`${row}-${col}`]));
+    const initialVisited = new Set([`${row}-${col}`]);
+    setVisited(initialVisited);
+    setVisitedOrder([{row, col}]);
     solveTour(row, col);
+    setStartTime(Date.now());
   }, [algorithm]);
 
   // Live timer update
@@ -73,11 +85,29 @@ const Chessboard: FC = () => {
     }
   }, [visited, knightPosition]);
 
-  const checkGameStatus = (visited: Set<string>) => {
+  const checkGameStatus = async (visited: Set<string>) => {
     if (visited.size === boardSize * boardSize) {
       setGameStatus("win");
+      await saveGameResult({
+        playerName,
+        status: "win",
+        timeTaken: (Date.now() - startTime) / 1000,
+        moves: visitedOrder,
+        algorithm,
+        timestamp: new Date(),
+   
+      });
     } else if (getValidMoves().length === 0) {
       setGameStatus("loss");
+      await saveGameResult({
+        playerName,
+        status: "loss",
+        timeTaken: (Date.now() - startTime) / 1000,
+        moves: visitedOrder,
+        algorithm,
+        timestamp: new Date(),
+   
+      });
     }
   };
 
@@ -115,7 +145,9 @@ const Chessboard: FC = () => {
       !visited.has(`${row}-${col}`)
     ) {
       setKnightPosition({ row, col });
-      setVisited(new Set(visited).add(`${row}-${col}`));
+      const newVisited = new Set(visited).add(`${row}-${col}`);
+      setVisited(newVisited);
+      setVisitedOrder([...visitedOrder, {row, col}]);
     }
   };
 
@@ -123,9 +155,11 @@ const Chessboard: FC = () => {
     const row = Math.floor(Math.random() * boardSize);
     const col = Math.floor(Math.random() * boardSize);
     setKnightPosition({ row, col });
-    setVisited(new Set([`${row}-${col}`]));
+    const initialVisited = new Set([`${row}-${col}`]);
+    setVisited(initialVisited);
+    setVisitedOrder([{row, col}]);
     setGameStatus("playing");
-    setStartTime(Date.now()); // Reset timer
+    setStartTime(Date.now());
     setTimeTaken(0);
     solveTour(row, col);
   };
@@ -168,7 +202,9 @@ const Chessboard: FC = () => {
                 >
                   {isVisited && (
                     <span className="absolute top-0 left-1 text-xs text-black">
-                      {[...visited].indexOf(`${rowIndex}-${colIndex}`) + 1}
+                      {visitedOrder.findIndex(move => 
+                        move.row === rowIndex && move.col === colIndex
+                      ) + 1}
                     </span>
                   )}
                 </div>
