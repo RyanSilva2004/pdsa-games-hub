@@ -7,8 +7,9 @@ import AlgorithmSelector from "./AlgorithmSelector";
 import { isValidKnightMove } from "../util/utils";
 import { solveKnightsTourBacktracking } from "../logic/backtracking";
 import { solveKnightsTourWarnsdorff } from "../logic/warnsdorff";
-import { saveGameResult } from "../util/gameService";
-import { useRouter } from "next/navigation";
+import { saveGameResult } from "../util/gameService"
+
+import { toast } from "react-hot-toast";
 
 interface ChessboardProps {
   playerName: string;
@@ -23,17 +24,31 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
   const [isComputingSolution, setIsComputingSolution] = useState(false);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [timeTaken, setTimeTaken] = useState<number>(0);
-  const [gameStatus, setGameStatus] = useState<"playing" | "win" | "loss">(
-    "playing"
-  );
-  const [algorithm, setAlgorithm] = useState<"backtracking" | "warnsdorff">(
-    "backtracking"
-  );
-  const router = useRouter();
+  const [gameStatus, setGameStatus] = useState<"playing" | "win" | "loss">("playing");
+  const [algorithm, setAlgorithm] = useState<"backtracking" | "warnsdorff">("backtracking");
 
-  // Function to solve the knight's tour based on selected algorithm
+  const showError = (message: string) => {
+    toast.error(message, {
+      position: "top-center",
+      duration: 3000,
+    });
+  };
+
+  const showSuccess = (message: string) => {
+    toast.success(message, {
+      position: "top-center",
+      duration: 3000,
+    });
+  };
+
   const solveTour = async (row: number, col: number) => {
+    if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+      showError("Invalid starting position for knight");
+      return;
+    }
+
     setIsComputingSolution(true);
+    
     try {
       let result;
       if (algorithm === "backtracking") {
@@ -47,28 +62,43 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
       } else {
         result = await solveKnightsTourWarnsdorff(row, col, boardSize);
       }
+      
+      // if (!result) {
+      //   throw new Error("Failed to find a solution");
+      // }
+      
       setSolution(result);
     } catch (error) {
       console.error("Failed to compute solution:", error);
+      showError("Failed to compute solution. Please try again.");
       setSolution(null);
     } finally {
       setIsComputingSolution(false);
     }
   };
 
-  // Initialize board
+  const initializeGame = () => {
+    try {
+      const row = Math.floor(Math.random() * boardSize);
+      const col = Math.floor(Math.random() * boardSize);
+      setKnightPosition({ row, col });
+      const initialVisited = new Set([`${row}-${col}`]);
+      setVisited(initialVisited);
+      setVisitedOrder([{row, col}]);
+      solveTour(row, col);
+      setStartTime(Date.now());
+      setGameStatus("playing");
+      setTimeTaken(0);
+    } catch (error) {
+      console.error("Game initialization failed:", error);
+      showError("Failed to initialize game. Please refresh the page.");
+    }
+  };
+
   useEffect(() => {
-    const row = Math.floor(Math.random() * boardSize);
-    const col = Math.floor(Math.random() * boardSize);
-    setKnightPosition({ row, col });
-    const initialVisited = new Set([`${row}-${col}`]);
-    setVisited(initialVisited);
-    setVisitedOrder([{row, col}]);
-    solveTour(row, col);
-    setStartTime(Date.now());
+    initializeGame();
   }, [algorithm]);
 
-  // Live timer update
   useEffect(() => {
     const timer = setInterval(() => {
       if (gameStatus === "playing") {
@@ -78,38 +108,11 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
     return () => clearInterval(timer);
   }, [gameStatus, startTime]);
 
-  // Check game status after moves
   useEffect(() => {
     if (visited.size > 0) {
       checkGameStatus(visited);
     }
   }, [visited, knightPosition]);
-
-  const checkGameStatus = async (visited: Set<string>) => {
-    if (visited.size === boardSize * boardSize) {
-      setGameStatus("win");
-      await saveGameResult({
-        playerName,
-        status: "win",
-        timeTaken: (Date.now() - startTime) / 1000,
-        moves: visitedOrder,
-        algorithm,
-        timestamp: new Date(),
-   
-      });
-    } else if (getValidMoves().length === 0) {
-      setGameStatus("loss");
-      await saveGameResult({
-        playerName,
-        status: "loss",
-        timeTaken: (Date.now() - startTime) / 1000,
-        moves: visitedOrder,
-        algorithm,
-        timestamp: new Date(),
-   
-      });
-    }
-  };
 
   const getValidMoves = useMemo(() => {
     const moves = [
@@ -139,29 +142,77 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
   }, [knightPosition, visited]);
 
   const handleSquareClick = (row: number, col: number) => {
-    if (gameStatus !== "playing") return;
-    if (
-      isValidKnightMove(knightPosition.row, knightPosition.col, row, col) &&
-      !visited.has(`${row}-${col}`)
-    ) {
+    if (gameStatus !== "playing") {
+      showError("Game has already ended. Start a new game.");
+      return;
+    }
+
+    if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+      showError("Invalid square selected");
+      return;
+    }
+
+    if (visited.has(`${row}-${col}`)) {
+      showError("This square has already been visited");
+      return;
+    }
+
+    if (!isValidKnightMove(knightPosition.row, knightPosition.col, row, col)) {
+      showError("Invalid knight move");
+      return;
+    }
+
+    try {
       setKnightPosition({ row, col });
       const newVisited = new Set(visited).add(`${row}-${col}`);
       setVisited(newVisited);
       setVisitedOrder([...visitedOrder, {row, col}]);
+    } catch (error) {
+      console.error("Move processing failed:", error);
+      showError("Failed to process move. Please try again.");
+    }
+  };
+
+  const checkGameStatus = async (visited: Set<string>) => {
+    try {
+      if (visited.size === boardSize * boardSize) {
+        setGameStatus("win");
+        showSuccess("Congratulations! You completed the Knight's Tour!");
+        await saveGameResult({
+          playerName,
+          status: "win",
+          timeTaken: (Date.now() - startTime) / 1000,
+          moves: visitedOrder,
+          algorithm,
+          timestamp: new Date(),
+          boardSize,
+        });
+      } else if (getValidMoves().length === 0) {
+        setGameStatus("loss");
+        showError("Game Over! No more valid moves.");
+        await saveGameResult({
+          playerName,
+          status: "loss",
+          timeTaken: (Date.now() - startTime) / 1000,
+          moves: visitedOrder,
+          algorithm,
+          timestamp: new Date(),
+          boardSize,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to save game result:", error);
+      showError("Failed to save game result. Your score may not be recorded.");
     }
   };
 
   const resetGame = () => {
-    const row = Math.floor(Math.random() * boardSize);
-    const col = Math.floor(Math.random() * boardSize);
-    setKnightPosition({ row, col });
-    const initialVisited = new Set([`${row}-${col}`]);
-    setVisited(initialVisited);
-    setVisitedOrder([{row, col}]);
-    setGameStatus("playing");
-    setStartTime(Date.now());
-    setTimeTaken(0);
-    solveTour(row, col);
+    try {
+      initializeGame();
+    } catch (error) {
+      console.error("Game reset failed:", error);
+      showError("Failed to reset game. Please refresh the page.");
+    }
   };
 
   const squares = Array(boardSize)
