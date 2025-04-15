@@ -12,4 +12,4 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const firestore = getFirestore(app);
 
-export { app  , firestore};
+export { app, firestore };
