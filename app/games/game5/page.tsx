@@ -1,4 +1,5 @@
-"use client"
+// app/knights-tour/page.tsx
+"use client";
 import { PageHeader } from "@/shared/components/page-header";
 import Chessboard from "./components/Chessboard";
 import NameInput from "./components/NameInput";
@@ -19,7 +20,7 @@ export default function KnightsTourPage() {
         ) : (
           <>
             <p className="mb-4 text-lg">Playing as: {playerName}</p>
-            <Chessboard />
+            <Chessboard playerName={playerName} />
           </>
         )}
       </div>
