@@ -1,4 +1,4 @@
-// components/Chessboard.tsx
+
 "use client";
 import { FC, useState, useEffect, useMemo } from "react";
 import Knight from "./Knight";
@@ -185,7 +185,7 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
           moves: visitedOrder,
           algorithm,
           timestamp: new Date(),
-          boardSize,
+         
         });
       } else if (getValidMoves().length === 0) {
         setGameStatus("loss");
@@ -197,7 +197,7 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
           moves: visitedOrder,
           algorithm,
           timestamp: new Date(),
-          boardSize,
+     
         });
       }
     } catch (error) {
@@ -222,6 +222,7 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
   return (
     <div className="flex flex-col items-center gap-4">
       <AlgorithmSelector algorithm={algorithm} setAlgorithm={setAlgorithm} />
+      
       <div className="relative">
         {isComputingSolution && (
           <div className="absolute top-2 left-2 bg-white p-2 rounded shadow">
@@ -264,13 +265,35 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
           )}
           <Knight position={knightPosition} />
         </div>
-        <GameStatus status={gameStatus} timeTaken={timeTaken} />
-        <button
-          onClick={resetGame}
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          New Game
-        </button>
+        <GameStatus 
+  status={gameStatus} 
+  timeTaken={timeTaken} 
+  onRestart={resetGame}  
+/>
+<button
+  onClick={resetGame}
+  className="relative mt-6 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:from-indigo-700 hover:to-purple-700 transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-50 overflow-hidden group"
+>
+  <span className="relative z-10 flex items-center justify-center gap-2">
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      className="h-5 w-5 group-hover:rotate-180 transition-transform duration-500" 
+      viewBox="0 0 20 20" 
+      fill="currentColor"
+    >
+      <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+    </svg>
+    New Game
+  </span>
+  
+  {/* Animated background elements */}
+  <span className="absolute inset-0 bg-gradient-to-r from-purple-700 to-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+  
+  {/* Ripple effect */}
+  <span className="absolute inset-0 overflow-hidden">
+    <span className="absolute top-1/2 left-1/2 w-0 h-0 bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2 group-hover:w-64 group-hover:h-64 group-hover:opacity-10 transition-all duration-700"></span>
+  </span>
+</button>
       </div>
     </div>
   );
