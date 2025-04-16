@@ -8,7 +8,7 @@ interface GameResult {
   moves: { row: number; col: number }[];
   algorithm: "backtracking" | "warnsdorff";
   timestamp: Date;
-  boardSize: number;
+
 }
 
 const validateGameResult = (result: GameResult): string | null => {
@@ -32,9 +32,7 @@ const validateGameResult = (result: GameResult): string | null => {
     return "Invalid algorithm";
   }
   
-  if (typeof result.boardSize !== "number" || result.boardSize <= 0) {
-    return "Invalid board size";
-  }
+
   
   return null;
 };

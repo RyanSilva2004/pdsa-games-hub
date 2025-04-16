@@ -1,4 +1,4 @@
-// app/knights-tour/page.tsx
+
 "use client";
 import { PageHeader } from "@/shared/components/page-header";
 import Chessboard from "./components/Chessboard";
