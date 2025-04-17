@@ -1,4 +1,4 @@
-const findAllNQueensSolutions = (n: number) => {
+const findAllNQueensSolutionsWithTime = (n: number) => {
   const results: number[][] = [];
 
   const isSafe = (board: number[], row: number, col: number) => {
@@ -24,8 +24,16 @@ const findAllNQueensSolutions = (n: number) => {
     }
   };
 
+  const start = performance.now();
   solveNQueens(Array(n).fill(-1), 0);
-  return results;
+  const end = performance.now();
+
+  const timeTakenMs = end - start;
+
+  return {
+    results,
+    timeTaken: timeTakenMs,
+  };
 };
 
-export default findAllNQueensSolutions;
+export default findAllNQueensSolutionsWithTime;
