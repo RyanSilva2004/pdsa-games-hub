@@ -15,6 +15,8 @@ import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
 import DrawImage from "@/public/draw.gif";
 import Image from "next/image";
+import { savePlayerWinResult, saveGameWithComputerTiming } from "../utils/dbLogger";
+
 
 export function TicTacToe() {
   const [board, setBoard] = useState(emptyBoard());
@@ -75,7 +77,7 @@ export function TicTacToe() {
       );
       if (resultData) {
         console.log("Player winning result:", resultData);
-        // send this to backend
+        savePlayerWinResult(resultData);
       }
     } else if (newBoard.flat().every((cell) => cell !== null)) {
       setWinner("Draw");
@@ -132,7 +134,7 @@ export function TicTacToe() {
       );
 
       console.log("Computer game result:", result);
-      // send this to backend
+      saveGameWithComputerTiming(result);
     }
   }, [winner]);
 
