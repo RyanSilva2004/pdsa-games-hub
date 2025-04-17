@@ -250,6 +250,7 @@ export function TravelingSalesmanGame() {
                   cities={availableCities}
                   adjacencyMatrix={adjacencyMatrix}
                   onMapReady={handleMapReady}
+                  homeCity={gameState.homeCity} 
                 />
               </div>
 
@@ -323,6 +324,7 @@ export function TravelingSalesmanGame() {
                   cities={availableCities}
                   adjacencyMatrix={adjacencyMatrix}
                   onCitySelect={handleCitySelectionToggle}
+                  homeCity={gameState.homeCity}
                 />
               </div>
 
