@@ -22,6 +22,7 @@ const allCities: City[] = [
 const initialGameState: GameState = {
   currentRoute: [],
   startCity: null,
+  homeCity: null,  // Add the homeCity property to initial state
   totalDistance: 0,
   isComplete: false,
 }
@@ -86,10 +87,29 @@ export function useGameLogic() {
     [gamePhase, forceNewGame, resetGame],
   )
 
+  // Select a random home city after map visualization
+  const selectRandomHomeCity = useCallback(() => {
+    if (availableCities.length === 0) return null;
+    
+    // Select a random city from available cities
+    const randomIndex = Math.floor(Math.random() * availableCities.length);
+    const homeCity = availableCities[randomIndex].id;
+    
+    // Update game state with the selected home city
+    setGameState(prevState => ({
+      ...prevState,
+      homeCity
+    }));
+    
+    return homeCity;
+  }, [availableCities]);
+
   // Called when the map visualization is complete
   const onMapVisualizationComplete = useCallback(() => {
-    setIsMapReady(true)
-  }, [])
+    setIsMapReady(true);
+    // Randomly select a home city when the map is ready
+    selectRandomHomeCity();
+  }, [selectRandomHomeCity]);
 
   // Move to city selection phase after map is visualized
   const startCitySelection = useCallback(() => {
@@ -101,13 +121,16 @@ export function useGameLogic() {
   // Toggle city selection
   const toggleCitySelection = useCallback(
     (cityId: string) => {
-      if (gamePhase !== GamePhase.CITY_SELECTION) return
+      if (gamePhase !== GamePhase.CITY_SELECTION) return;
+      
+      // Check if the city is the home city, if so don't allow selection
+      if (cityId === gameState.homeCity) return;
 
       setAvailableCities((prev) =>
         prev.map((city) => (city.id === cityId ? { ...city, selected: !city.selected } : city)),
       )
     },
-    [gamePhase],
+    [gamePhase, gameState.homeCity],
   )
 
   // Confirm city selection
@@ -119,6 +142,7 @@ export function useGameLogic() {
       return false
     }
 
+    setAvailableCities(selected); // Sync availableCities with selectedCities
     setSelectedCities(selected)
 
     // Create a new adjacency matrix with only the selected cities

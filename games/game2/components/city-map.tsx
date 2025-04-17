@@ -16,6 +16,7 @@ interface CityMapProps {
   onCitySelect?: (cityId: string) => void
   onMapReady?: () => void
   highlightRoute?: string[]
+  homeCity?: string | null  // Added home city prop
 }
 
 // Define a neon color palette for edges
@@ -40,6 +41,7 @@ export function CityMap({
   onCitySelect,
   onMapReady,
   highlightRoute,
+  homeCity,
 }: CityMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { theme } = useTheme()
@@ -104,6 +106,7 @@ export function CityMap({
       phase,
       currentRoute,
       highlightRoute,
+      homeCity,
     )
   }, [cities, cityPositions, adjacencyMatrix, theme, currentRoute, isAnimating, highlightRoute, phase])
 
@@ -447,7 +450,7 @@ export function CityMap({
       }
     })
 
-    // Add weak central gravity to prevent cities from drifting too far apart
+    // Apply weak central gravity to prevent cities from drifting too far apart
     const centerX = width / 2
     const centerY = height / 2
     const gravitationalConstant = 0.0005
@@ -761,6 +764,7 @@ export function CityMap({
             phase,
             currentRoute,
             highlightRoute,
+            homeCity,
           )
         }
         break
@@ -811,6 +815,7 @@ function redrawMap(
   phase: GamePhase,
   currentRoute: string[] = [],
   highlightRoute?: string[],
+  homeCity?: string | null,
 ) {
   // Clear canvas
   ctx.clearRect(0, 0, width, height)
@@ -872,8 +877,9 @@ function redrawMap(
   cities.forEach((city) => {
     const isInRoute = currentRoute.includes(city.id)
     const isStartCity = currentRoute.length > 0 && currentRoute[0] === city.id
+    const isHomeCity = city.id === homeCity
 
-    drawCityNode(ctx, city, cityPositions[city.id], isDarkMode, phase, isInRoute, isStartCity)
+    drawCityNode(ctx, city, cityPositions[city.id], isDarkMode, phase, isInRoute, isStartCity, isHomeCity)
   })
 }
 
@@ -1095,14 +1101,16 @@ function drawCityNode(
   phase: GamePhase,
   isInRoute = false,
   isStartCity = false,
+  isHomeCity = false,  // Added isHomeCity parameter
 ) {
   // Reduced node radius while maintaining good visibility
   const nodeRadius = 25
 
   // Create a subtle glow effect
   if (isDarkMode) {
-    ctx.shadowColor = isStartCity ? "#10B981" : isInRoute ? "#8B5CF6" : city.selected ? "#3B82F6" : "#4B5563"
-    ctx.shadowBlur = 12
+    // Choose glow color based on city status - home city gets a gold glow
+    ctx.shadowColor = isHomeCity ? "#FFD700" : isStartCity ? "#10B981" : isInRoute ? "#8B5CF6" : city.selected ? "#3B82F6" : "#4B5563"
+    ctx.shadowBlur = isHomeCity ? 15 : 12  // Stronger glow for home city
   }
 
   // Draw city circle with gradient
@@ -1115,7 +1123,11 @@ function drawCityNode(
     nodeRadius,
   )
 
-  if (isStartCity) {
+  if (isHomeCity) {
+    // Home city in gold
+    gradient.addColorStop(0, isDarkMode ? "#FFDF00" : "#FFD700")  // Gold
+    gradient.addColorStop(1, isDarkMode ? "#B8860B" : "#DAA520")  // Darker gold
+  } else if (isStartCity) {
     // Start city in green
     gradient.addColorStop(0, isDarkMode ? "#34D399" : "#10B981")
     gradient.addColorStop(1, isDarkMode ? "#059669" : "#047857")
@@ -1138,9 +1150,11 @@ function drawCityNode(
   ctx.fillStyle = gradient
   ctx.fill()
 
-  // Add a subtle border
-  ctx.strokeStyle = isDarkMode ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"
-  ctx.lineWidth = 2
+  // Add a subtle border - gold for home city
+  ctx.strokeStyle = isHomeCity 
+    ? (isDarkMode ? "rgba(255, 215, 0, 0.8)" : "rgba(218, 165, 32, 0.8)")  
+    : (isDarkMode ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)")
+  ctx.lineWidth = isHomeCity ? 3 : 2  // Thicker border for home city
   ctx.stroke()
 
   // Add an inner ring for selected cities for better visual feedback
@@ -1150,6 +1164,31 @@ function drawCityNode(
     ctx.strokeStyle = isDarkMode ? "#FFFFFF" : "#000000"
     ctx.lineWidth = 1.5
     ctx.stroke()
+  }
+
+  // Add a "home" indicator for home city
+  if (isHomeCity) {
+    // Draw a home icon or symbol
+    const homeSize = 10;
+    
+    // Draw a little house shape
+    ctx.beginPath();
+    // Roof
+    ctx.moveTo(position.x, position.y - nodeRadius - 5);
+    ctx.lineTo(position.x - homeSize, position.y - nodeRadius + 5);
+    ctx.lineTo(position.x + homeSize, position.y - nodeRadius + 5);
+    ctx.closePath();
+    
+    ctx.fillStyle = isDarkMode ? "#FFF" : "#000";
+    ctx.fill();
+    
+    // House body
+    ctx.fillRect(
+      position.x - homeSize * 0.7, 
+      position.y - nodeRadius + 5, 
+      homeSize * 1.4, 
+      homeSize * 0.8
+    );
   }
 
   // Reset shadow
