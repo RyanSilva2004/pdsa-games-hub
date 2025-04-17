@@ -16,6 +16,7 @@ export function TravelingSalesmanGame() {
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null)
   const [showOptimalRoute, setShowOptimalRoute] = useState(false)
   const [cityCount, setCityCount] = useState<number>(6) // Default to 6 cities
+  const [cityMapKey, setCityMapKey] = useState<number>(0) // Used to force remount only when needed
 
   const {
     gamePhase,
@@ -126,6 +127,7 @@ export function TravelingSalesmanGame() {
   // Start a new game
   const handleNewGame = () => {
     forceStartNewGame()
+    setCityMapKey(prev => prev + 1) // Force CityMap to remount on new game
     setShowOptimalRoute(false)
     setMessage({
       type: "info",
@@ -137,6 +139,21 @@ export function TravelingSalesmanGame() {
       setMessage(null)
     }, 5000)
   }
+
+  // Helper function for rendering CityMap - used in multiple phases
+  const renderCityMap = () => (
+    <CityMap
+      key={cityMapKey} // Only changes when starting a new game
+      phase={gamePhase}
+      cities={availableCities}
+      adjacencyMatrix={adjacencyMatrix}
+      onMapReady={gamePhase === GamePhase.MAP_VISUALIZATION ? handleMapReady : undefined}
+      onCitySelect={gamePhase === GamePhase.CITY_SELECTION ? handleCitySelectionToggle : undefined}
+      currentRoute={gameState.currentRoute}
+      highlightRoute={showOptimalRoute ? optimalRoute?.route : undefined}
+      homeCity={gameState.homeCity}
+    />
+  )
 
   return (
     <Card className="w-full max-w-6xl border-purple-200 dark:border-purple-900">
@@ -245,13 +262,7 @@ export function TravelingSalesmanGame() {
 
             <div className="flex flex-col md:flex-row gap-6">
               <div className="w-full md:w-3/4 h-[500px]">
-                <CityMap
-                  phase={gamePhase}
-                  cities={availableCities}
-                  adjacencyMatrix={adjacencyMatrix}
-                  onMapReady={handleMapReady}
-                  homeCity={gameState.homeCity} 
-                />
+                {renderCityMap()}
               </div>
 
               <div className="w-full md:w-1/4 space-y-4">
@@ -319,13 +330,7 @@ export function TravelingSalesmanGame() {
 
             <div className="flex flex-col md:flex-row gap-6">
               <div className="w-full md:w-3/4 h-[500px]">
-                <CityMap
-                  phase={gamePhase}
-                  cities={availableCities}
-                  adjacencyMatrix={adjacencyMatrix}
-                  onCitySelect={handleCitySelectionToggle}
-                  homeCity={gameState.homeCity}
-                />
+                {renderCityMap()}
               </div>
 
               <div className="w-full md:w-1/4 space-y-4">
