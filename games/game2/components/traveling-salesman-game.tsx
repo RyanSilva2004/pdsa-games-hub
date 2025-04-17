@@ -87,6 +87,15 @@ function RouteBuilder({ homeCity, availableCities, selectedCities, onSubmit }: R
     )
   }
 
+  // Check if Return Home button should be active
+  const canReturnHome = () => {
+    return (
+      userRoute.length > 1 && 
+      remainingCities.length === 0 && // All required cities visited
+      userRoute[userRoute.length - 1] !== homeCity // Not already returned home
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-md">
@@ -159,9 +168,9 @@ function RouteBuilder({ homeCity, availableCities, selectedCities, onSubmit }: R
           </Button>
           <Button 
             onClick={completeRoute} 
-            variant="outline" 
-            disabled={remainingCities.length > 0 || userRoute.length <= 1 || userRoute[userRoute.length - 1] === homeCity}
-            className="flex-1"
+            variant={canReturnHome() ? "default" : "outline"}
+            disabled={!canReturnHome()}
+            className={`flex-1 ${canReturnHome() ? "bg-yellow-500 hover:bg-yellow-600" : ""}`}
           >
             Return Home
           </Button>
@@ -205,6 +214,7 @@ export function TravelingSalesmanGame() {
     resetGame,
     calculateOptimalRoute,
     forceStartNewGame,
+    setGamePhase,
   } = useGameLogic()
 
   // Start the game after name entry
@@ -299,6 +309,12 @@ export function TravelingSalesmanGame() {
     forceStartNewGame()
     setCityMapKey(prev => prev + 1) // Force CityMap to remount on new game
     setShowOptimalRoute(false)
+    setUserSolution([])
+    setSolutionDistance(0)
+
+    // The key change: preserve player name but reset game state
+    setGamePhase(GamePhase.SETUP)
+    
     setMessage({
       type: "info",
       text: "Starting a new game. Please select the number of cities.",
@@ -312,37 +328,51 @@ export function TravelingSalesmanGame() {
 
   // Handle user route submission
   const handleRouteSubmit = (route: string[]) => {
-    if (!adjacencyMatrix) return
+    if (!adjacencyMatrix) return;
 
     // Calculate the distance of user's route
-    const distance = adjacencyMatrix.calculateRouteDistance(route)
+    const distance = adjacencyMatrix.calculateRouteDistance(route);
     
-    setUserSolution(route)
-    setSolutionDistance(distance)
+    setUserSolution(route);
+    setSolutionDistance(distance);
     
-    // Get optimal route for comparison
-    const optimal = calculateOptimalRoute()
+    // Calculate the optimal route for comparison
+    const optimal = calculateOptimalRoute();
     
     if (optimal) {
-      setMessage({
-        type: "success",
-        text: `Your route has a total distance of ${distance} km. The optimal route has ${optimal.distance} km.`,
-      })
+      // Determine if user found the optimal solution
+      const isOptimal = distance === optimal.distance;
       
-      // Show the optimal route after a short delay
-      setTimeout(() => {
-        setShowOptimalRoute(true)
-      }, 2000)
+      // Calculate how close they were as a percentage
+      const percentageFromOptimal = ((distance - optimal.distance) / optimal.distance * 100).toFixed(1);
+      
+      // Set appropriate message based on result
+      if (isOptimal) {
+        setMessage({
+          type: "success",
+          text: `Congratulations! You found the optimal route with a total distance of ${distance} km!`,
+        });
+      } else {
+        setMessage({
+          type: "info",
+          text: `Your route has a total distance of ${distance} km. The optimal route is ${optimal.distance} km (${percentageFromOptimal}% difference).`,
+        });
+        
+        // Show the optimal route immediately if the user's solution is wrong
+        setShowOptimalRoute(true);
+      }
     } else {
       setMessage({
         type: "info",
         text: `Your route has a total distance of ${distance} km.`,
-      })
+      });
     }
     
-    // Move to completed phase
-    setGamePhase(GamePhase.COMPLETED)
-  }
+    // Move to completed phase using the correct function from useGameLogic
+    if (gamePhase === GamePhase.ROUTE_PLANNING) {
+      setGamePhase(GamePhase.COMPLETED);
+    }
+  };
 
   // Helper function for rendering CityMap - used in multiple phases
   const renderCityMap = () => (
