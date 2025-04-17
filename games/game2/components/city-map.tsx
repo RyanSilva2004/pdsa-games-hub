@@ -16,6 +16,7 @@ interface CityMapProps {
   onCitySelect?: (cityId: string) => void
   onMapReady?: () => void
   highlightRoute?: string[]
+  homeCity?: string | null  // Added home city prop
 }
 
 // Define a neon color palette for edges
@@ -40,50 +41,90 @@ export function CityMap({
   onCitySelect,
   onMapReady,
   highlightRoute,
+  homeCity,
 }: CityMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { theme } = useTheme()
   const [isAnimating, setIsAnimating] = useState(false)
   const [cityPositions, setCityPositions] = useState<Record<string, { x: number; y: number }>>({})
+  const initialVisualizationDoneRef = useRef<boolean>(false)
 
   // Calculate city positions based on distances
   useEffect(() => {
-    if (!cities.length || Object.keys(cityPositions).length > 0) {
-      return // Skip if we already have positions or no cities
+    if (!cities.length) return // No cities to render
+    
+    // If we already have positions, just redraw with current positions
+    if (Object.keys(cityPositions).length > 0) {
+      const canvas = canvasRef.current
+      if (!canvas) return
+
+      canvas.width = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+      
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        redrawMap(
+          ctx,
+          canvas.width,
+          canvas.height,
+          cities,
+          cityPositions,
+          adjacencyMatrix,
+          theme === "dark",
+          phase,
+          currentRoute,
+          highlightRoute,
+          homeCity
+        )
+      }
+      return
     }
 
-    setIsAnimating(true)
+    // Skip animation if we're not in MAP_VISUALIZATION phase
+    // or if we've already done the initial visualization
+    if (initialVisualizationDoneRef.current && phase !== GamePhase.MAP_VISUALIZATION) {
+      return
+    }
+    
+    // Only animate during MAP_VISUALIZATION phase or if positions aren't initialized yet
+    if (phase === GamePhase.MAP_VISUALIZATION || !initialVisualizationDoneRef.current) {
+      setIsAnimating(true)
 
-    // Calculate initial positions using force-directed placement
-    const canvas = canvasRef.current
-    if (!canvas) return
+      // Calculate initial positions using force-directed placement
+      const canvas = canvasRef.current
+      if (!canvas) return
 
-    const width = canvas.offsetWidth
-    const height = canvas.offsetHeight
+      const width = canvas.offsetWidth
+      const height = canvas.offsetHeight
 
-    // Set canvas dimensions
-    canvas.width = width
-    canvas.height = height
+      // Set canvas dimensions
+      canvas.width = width
+      canvas.height = height
 
-    // Clear canvas
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
+      // Clear canvas
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return
 
-    // Draw map background
-    const isDarkMode = theme === "dark"
-    drawMapBackground(ctx, width, height, isDarkMode)
+      // Draw map background
+      const isDarkMode = theme === "dark"
+      drawMapBackground(ctx, width, height, isDarkMode)
 
-    // Calculate positions incrementally
-    calculateAndAnimatePositions(ctx, cities, adjacencyMatrix, width, height, isDarkMode, phase, () => {
-      // Notify parent that map visualization is complete
-      if (phase === GamePhase.MAP_VISUALIZATION && onMapReady) {
-        onMapReady()
-      }
-    })
-  }, [cities, adjacencyMatrix, theme, phase, onMapReady])
+      // Calculate positions incrementally
+      calculateAndAnimatePositions(ctx, cities, adjacencyMatrix, width, height, isDarkMode, phase, () => {
+        // Mark that we've done the initial visualization
+        initialVisualizationDoneRef.current = true
+        
+        // Notify parent that map visualization is complete
+        if (phase === GamePhase.MAP_VISUALIZATION && onMapReady) {
+          onMapReady()
+        }
+      })
+    }
+  }, [cities, adjacencyMatrix, theme, phase, onMapReady, cityPositions, currentRoute, highlightRoute, homeCity])
 
   // Draw the current route when it changes
   useEffect(() => {
+    // Don't redraw if we're still animating or no positions available
     if (Object.keys(cityPositions).length === 0 || isAnimating) return
 
     const canvas = canvasRef.current
@@ -104,8 +145,9 @@ export function CityMap({
       phase,
       currentRoute,
       highlightRoute,
+      homeCity,
     )
-  }, [cities, cityPositions, adjacencyMatrix, theme, currentRoute, isAnimating, highlightRoute, phase])
+  }, [cities, cityPositions, adjacencyMatrix, theme, currentRoute, isAnimating, highlightRoute, phase, homeCity])
 
   // Calculate and animate city positions
   const calculateAndAnimatePositions = (
@@ -447,7 +489,7 @@ export function CityMap({
       }
     })
 
-    // Add weak central gravity to prevent cities from drifting too far apart
+    // Apply weak central gravity to prevent cities from drifting too far apart
     const centerX = width / 2
     const centerY = height / 2
     const gravitationalConstant = 0.0005
@@ -761,6 +803,7 @@ export function CityMap({
             phase,
             currentRoute,
             highlightRoute,
+            homeCity,
           )
         }
         break
@@ -811,6 +854,7 @@ function redrawMap(
   phase: GamePhase,
   currentRoute: string[] = [],
   highlightRoute?: string[],
+  homeCity?: string | null,
 ) {
   // Clear canvas
   ctx.clearRect(0, 0, width, height)
@@ -872,8 +916,9 @@ function redrawMap(
   cities.forEach((city) => {
     const isInRoute = currentRoute.includes(city.id)
     const isStartCity = currentRoute.length > 0 && currentRoute[0] === city.id
+    const isHomeCity = city.id === homeCity
 
-    drawCityNode(ctx, city, cityPositions[city.id], isDarkMode, phase, isInRoute, isStartCity)
+    drawCityNode(ctx, city, cityPositions[city.id], isDarkMode, phase, isInRoute, isStartCity, isHomeCity)
   })
 }
 
@@ -1095,14 +1140,16 @@ function drawCityNode(
   phase: GamePhase,
   isInRoute = false,
   isStartCity = false,
+  isHomeCity = false,  // Added isHomeCity parameter
 ) {
   // Reduced node radius while maintaining good visibility
   const nodeRadius = 25
 
   // Create a subtle glow effect
   if (isDarkMode) {
-    ctx.shadowColor = isStartCity ? "#10B981" : isInRoute ? "#8B5CF6" : city.selected ? "#3B82F6" : "#4B5563"
-    ctx.shadowBlur = 12
+    // Choose glow color based on city status - home city gets a gold glow
+    ctx.shadowColor = isHomeCity ? "#FFD700" : isStartCity ? "#10B981" : isInRoute ? "#8B5CF6" : city.selected ? "#3B82F6" : "#4B5563"
+    ctx.shadowBlur = isHomeCity ? 15 : 12  // Stronger glow for home city
   }
 
   // Draw city circle with gradient
@@ -1115,7 +1162,11 @@ function drawCityNode(
     nodeRadius,
   )
 
-  if (isStartCity) {
+  if (isHomeCity) {
+    // Home city in gold
+    gradient.addColorStop(0, isDarkMode ? "#FFDF00" : "#FFD700")  // Gold
+    gradient.addColorStop(1, isDarkMode ? "#B8860B" : "#DAA520")  // Darker gold
+  } else if (isStartCity) {
     // Start city in green
     gradient.addColorStop(0, isDarkMode ? "#34D399" : "#10B981")
     gradient.addColorStop(1, isDarkMode ? "#059669" : "#047857")
@@ -1138,9 +1189,11 @@ function drawCityNode(
   ctx.fillStyle = gradient
   ctx.fill()
 
-  // Add a subtle border
-  ctx.strokeStyle = isDarkMode ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"
-  ctx.lineWidth = 2
+  // Add a subtle border - gold for home city
+  ctx.strokeStyle = isHomeCity 
+    ? (isDarkMode ? "rgba(255, 215, 0, 0.8)" : "rgba(218, 165, 32, 0.8)")  
+    : (isDarkMode ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)")
+  ctx.lineWidth = isHomeCity ? 3 : 2  // Thicker border for home city
   ctx.stroke()
 
   // Add an inner ring for selected cities for better visual feedback
@@ -1150,6 +1203,31 @@ function drawCityNode(
     ctx.strokeStyle = isDarkMode ? "#FFFFFF" : "#000000"
     ctx.lineWidth = 1.5
     ctx.stroke()
+  }
+
+  // Add a "home" indicator for home city
+  if (isHomeCity) {
+    // Draw a home icon or symbol
+    const homeSize = 10;
+    
+    // Draw a little house shape
+    ctx.beginPath();
+    // Roof
+    ctx.moveTo(position.x, position.y - nodeRadius - 5);
+    ctx.lineTo(position.x - homeSize, position.y - nodeRadius + 5);
+    ctx.lineTo(position.x + homeSize, position.y - nodeRadius + 5);
+    ctx.closePath();
+    
+    ctx.fillStyle = isDarkMode ? "#FFF" : "#000";
+    ctx.fill();
+    
+    // House body
+    ctx.fillRect(
+      position.x - homeSize * 0.7, 
+      position.y - nodeRadius + 5, 
+      homeSize * 1.4, 
+      homeSize * 0.8
+    );
   }
 
   // Reset shadow
