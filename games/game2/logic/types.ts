@@ -11,6 +11,7 @@ export type Route = string[]
 export interface GameState {
   currentRoute: string[]
   startCity: string | null
+  homeCity: string | null  // Added homeCity property to track the randomly selected home city
   totalDistance: number
   isComplete: boolean
 }
