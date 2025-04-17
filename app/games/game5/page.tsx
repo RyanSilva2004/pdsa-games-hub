@@ -1,10 +1,10 @@
 
 "use client";
 import { PageHeader } from "@/shared/components/page-header";
-import Chessboard from "./components/Chessboard";
-import NameInput from "./components/NameInput";
+import Chessboard from "./components/Chessboard/Chessboard";
+import NameInput from "./components/NameInput/NameInput";
 import { useState } from "react";
-import ErrorBoundary from "./components/ErrorBoundary";
+import ErrorBoundary from "./components/ErrorBoundary/ErrorBoundary";
 import { Toaster } from "react-hot-toast";
 
 export default function KnightsTourPage() {
