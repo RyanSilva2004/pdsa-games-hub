@@ -142,17 +142,11 @@ export function useGameLogic() {
       return false
     }
 
-    setAvailableCities(selected); // Sync availableCities with selectedCities
+    // Keep the same cities in availableCities, but mark the mandatory visit cities
     setSelectedCities(selected)
 
-    // Create a new adjacency matrix with only the selected cities
-    const cityIds = selected.map((city) => city.id)
-    const matrix = new AdjacencyMatrix(cityIds)
-    setAdjacencyMatrix(matrix)
-
-    // For now, we just save the selection
-    // In the future, we would move to route planning phase
-    // setGamePhase(GamePhase.ROUTE_PLANNING)
+    // Move to route planning phase with all cities still available
+    setGamePhase(GamePhase.ROUTE_PLANNING)
 
     return true
   }, [availableCities])
