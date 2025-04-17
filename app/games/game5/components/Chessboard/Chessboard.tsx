@@ -1,13 +1,13 @@
 
 "use client";
 import { FC, useState, useEffect, useMemo } from "react";
-import Knight from "./Knight";
-import GameStatus from "./GameStatus";
-import AlgorithmSelector from "./AlgorithmSelector";
-import { isValidKnightMove } from "../util/utils";
-import { solveKnightsTourBacktracking } from "../logic/backtracking";
-import { solveKnightsTourWarnsdorff } from "../logic/warnsdorff";
-import { saveGameResult } from "../util/gameService"
+import Knight from "../Knight/Knight";
+import GameStatus from "../GameStatus/GameStatus";
+import AlgorithmSelector from "../AlgorithmSelector/AlgorithmSelector";
+import { isValidKnightMove } from "../../util/utils";
+import { solveKnightsTourBacktracking } from "../../logic/backtracking";
+import { solveKnightsTourWarnsdorff } from "../../logic/warnsdorff";
+import { saveGameResult } from "../../util/gameService"
 
 import { toast } from "react-hot-toast";
 
