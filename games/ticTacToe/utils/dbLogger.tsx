@@ -16,5 +16,14 @@ export async function savePlayerWinResult(data: any) {
 }
 
 export async function saveGameWithComputerTiming(data: any) {
-  
+    try {
+        const resultToSave = {
+            ...data,
+            board: JSON.stringify(data.board), 
+          };
+        await addDoc(collection(db, "computerGameResults"), resultToSave);
+        console.log("Game result saved with computer timing successfully:", resultToSave);
+      } catch (error) {
+        console.error("Error saving game result:", error);
+      }
 }
