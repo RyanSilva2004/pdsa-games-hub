@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Component, useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { PageHeader } from "@/shared/components/page-header";
 import QueenIcon from "@/public/icons/queen.icon";
 import Image from "next/image";
@@ -9,6 +9,10 @@ import LostImage from "@/public/over.gif";
 import findAllNQueensSolutions from "./utils/eightQueensSolver";
 import { CommonContext } from "@/context/Common";
 import { createUser, createGuestUser } from "../../api/user";
+import {
+  addGeneratedSolution,
+  getAllSolutions,
+} from "@/app/api/eightQueensPuzzle/EightQueensPuzzleService";
 
 type ScoreEntry = {
   name: string;
@@ -83,7 +87,7 @@ const EightQueensPuzzle = () => {
   }, []);
 
   useEffect(() => {
-    handleUser();
+    // handleUser();
   }, []);
 
   const formatTime = (timeInSeconds: number) => {
@@ -195,9 +199,7 @@ const EightQueensPuzzle = () => {
     setTimerInterval(interval);
   };
 
-  const updateUserGameHistory = (data: userGameSummary) => {
-    console.log("game history data : ", data);
-  };
+  const updateUserGameHistory = (data: userGameSummary) => {};
 
   const sendGameDataToServer = async () => {
     const gameData: userGameSummary = {
@@ -224,8 +226,102 @@ const EightQueensPuzzle = () => {
     };
   }, [timerInterval]);
 
+  const runWorkerAndSaveSolution = (
+    board: number[],
+    method: "threaded" | "sequential",
+    timeTaken: number
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      const worker = new Worker(
+        new URL("./utils/workerThread", import.meta.url)
+      );
+
+      const n = board.length;
+      worker.postMessage({ n });
+
+      worker.onmessage = async (e) => {
+        const workerResults: number[][] = e.data;
+
+        const solutionStrings = workerResults.map((solution) =>
+          solution.join(",")
+        );
+        console.log("workerResults length:", workerResults.length);
+        console.log("Method passed to addGeneratedSolution:", method);
+        try {
+          if (workerResults.length === 0) {
+            await addGeneratedSolution(solutionStrings, method, timeTaken);
+            console.log(`${method} solution saved to Firestore.`);
+          }
+          resolve();
+        } catch (error) {
+          console.error(`Error saving ${method} solution:`, error);
+          reject(error);
+        } finally {
+          worker.terminate();
+        }
+      };
+
+      worker.postMessage(board);
+    });
+  };
+
+  const storeSolutionsIfNew = async () => {
+    const backtrackingStart = performance.now();
+    const backtrackingResults = findAllNQueensSolutions(BOARD_SIZE);
+    const backtrackingEnd = performance.now();
+
+    const backtrackingTime = backtrackingEnd - backtrackingStart;
+
+    const existingSolutions = await getAllSolutions();
+
+    const stringifiedResults = backtrackingResults.results.map((solution) =>
+      solution.join(",")
+    );
+
+    const existingStringifiedSolutions = existingSolutions.map((solutionDoc) =>
+      solutionDoc.solution.join(",")
+    );
+
+    for (const solution of stringifiedResults) {
+      if (!existingStringifiedSolutions.includes(solution)) {
+        try {
+          await addGeneratedSolution(
+            solution.split(","),
+            "sequential",
+            backtrackingTime
+          );
+          console.log("Backtracking solution saved to Firestore.");
+        } catch (error) {
+          console.error("Error saving backtracking solution:", error);
+        }
+      }
+    }
+
+    const workerStart = performance.now();
+    try {
+      await runWorkerAndSaveSolution(
+        backtrackingResults.results[0],
+        "threaded",
+        backtrackingTime
+      );
+      const workerEnd = performance.now();
+
+      const workerTime = workerEnd - workerStart;
+      await addGeneratedSolution(
+        [
+          `Time taken for backtracking: ${backtrackingTime}ms, Time taken for worker: ${workerTime}ms`,
+        ],
+        "comparison",
+        0
+      );
+      console.log("Time comparison saved to Firestore.");
+    } catch (error) {
+      console.error("Error saving worker solution or time comparison:", error);
+    }
+  };
+
   useEffect(() => {
-    console.log("results ", findAllNQueensSolutions(BOARD_SIZE));
+    storeSolutionsIfNew();
   }, []);
 
   return (
