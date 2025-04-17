@@ -47,45 +47,84 @@ export function CityMap({
   const { theme } = useTheme()
   const [isAnimating, setIsAnimating] = useState(false)
   const [cityPositions, setCityPositions] = useState<Record<string, { x: number; y: number }>>({})
+  const initialVisualizationDoneRef = useRef<boolean>(false)
 
   // Calculate city positions based on distances
   useEffect(() => {
-    if (!cities.length || Object.keys(cityPositions).length > 0) {
-      return // Skip if we already have positions or no cities
+    if (!cities.length) return // No cities to render
+    
+    // If we already have positions, just redraw with current positions
+    if (Object.keys(cityPositions).length > 0) {
+      const canvas = canvasRef.current
+      if (!canvas) return
+
+      canvas.width = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+      
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        redrawMap(
+          ctx,
+          canvas.width,
+          canvas.height,
+          cities,
+          cityPositions,
+          adjacencyMatrix,
+          theme === "dark",
+          phase,
+          currentRoute,
+          highlightRoute,
+          homeCity
+        )
+      }
+      return
     }
 
-    setIsAnimating(true)
+    // Skip animation if we're not in MAP_VISUALIZATION phase
+    // or if we've already done the initial visualization
+    if (initialVisualizationDoneRef.current && phase !== GamePhase.MAP_VISUALIZATION) {
+      return
+    }
+    
+    // Only animate during MAP_VISUALIZATION phase or if positions aren't initialized yet
+    if (phase === GamePhase.MAP_VISUALIZATION || !initialVisualizationDoneRef.current) {
+      setIsAnimating(true)
 
-    // Calculate initial positions using force-directed placement
-    const canvas = canvasRef.current
-    if (!canvas) return
+      // Calculate initial positions using force-directed placement
+      const canvas = canvasRef.current
+      if (!canvas) return
 
-    const width = canvas.offsetWidth
-    const height = canvas.offsetHeight
+      const width = canvas.offsetWidth
+      const height = canvas.offsetHeight
 
-    // Set canvas dimensions
-    canvas.width = width
-    canvas.height = height
+      // Set canvas dimensions
+      canvas.width = width
+      canvas.height = height
 
-    // Clear canvas
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
+      // Clear canvas
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return
 
-    // Draw map background
-    const isDarkMode = theme === "dark"
-    drawMapBackground(ctx, width, height, isDarkMode)
+      // Draw map background
+      const isDarkMode = theme === "dark"
+      drawMapBackground(ctx, width, height, isDarkMode)
 
-    // Calculate positions incrementally
-    calculateAndAnimatePositions(ctx, cities, adjacencyMatrix, width, height, isDarkMode, phase, () => {
-      // Notify parent that map visualization is complete
-      if (phase === GamePhase.MAP_VISUALIZATION && onMapReady) {
-        onMapReady()
-      }
-    })
-  }, [cities, adjacencyMatrix, theme, phase, onMapReady])
+      // Calculate positions incrementally
+      calculateAndAnimatePositions(ctx, cities, adjacencyMatrix, width, height, isDarkMode, phase, () => {
+        // Mark that we've done the initial visualization
+        initialVisualizationDoneRef.current = true
+        
+        // Notify parent that map visualization is complete
+        if (phase === GamePhase.MAP_VISUALIZATION && onMapReady) {
+          onMapReady()
+        }
+      })
+    }
+  }, [cities, adjacencyMatrix, theme, phase, onMapReady, cityPositions, currentRoute, highlightRoute, homeCity])
 
   // Draw the current route when it changes
   useEffect(() => {
+    // Don't redraw if we're still animating or no positions available
     if (Object.keys(cityPositions).length === 0 || isAnimating) return
 
     const canvas = canvasRef.current
@@ -108,7 +147,7 @@ export function CityMap({
       highlightRoute,
       homeCity,
     )
-  }, [cities, cityPositions, adjacencyMatrix, theme, currentRoute, isAnimating, highlightRoute, phase])
+  }, [cities, cityPositions, adjacencyMatrix, theme, currentRoute, isAnimating, highlightRoute, phase, homeCity])
 
   // Calculate and animate city positions
   const calculateAndAnimatePositions = (
