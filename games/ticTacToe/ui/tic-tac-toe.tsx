@@ -15,8 +15,10 @@ import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
 import DrawImage from "@/public/draw.gif";
 import Image from "next/image";
-import { savePlayerWinResult, saveGameWithComputerTiming } from "../utils/dbLogger";
-
+import {
+  savePlayerWinResult,
+  saveGameWithComputerTiming,
+} from "../utils/dbLogger";
 
 export function TicTacToe() {
   const [board, setBoard] = useState(emptyBoard());
@@ -35,6 +37,7 @@ export function TicTacToe() {
   const [playerWins, setPlayerWins] = useState(0);
   const [computerWins, setComputerWins] = useState(0);
   const [draws, setDraws] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || winner || !isHumanTurn) return;
@@ -238,6 +241,41 @@ export function TicTacToe() {
       <h2 className="text-xl font-medium text-center">
         Hello, {playerName}! It's {isHumanTurn ? "your" : "computer"} turn
       </h2>
+      {showHelp && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-80 text-center shadow-lg relative">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">How to Play</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              <b>Welcome to 5x5 Tic Tac Toe!</b>
+              <br />
+              <br />
+              Try to get five of your <b>'X'</b>s in a row:{" "}
+              <i>vertically, horizontally, or diagonally</i>, before the
+              computer lines up five <b>'O'</b>s.
+              <br />
+              <br />
+              You’re always <b>'X'</b> and go first.
+              <br />
+              You can undo only your last move.
+              <br />
+              <br />
+              Good luck and have fun!
+            </p>
+            <button
+              onClick={() => setShowHelp(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-black"
+            >
+              ✖
+            </button>
+            <button
+              onClick={() => setShowHelp(false)}
+              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-row space-x-6 items-center">
         {/* Game Board */}
@@ -279,52 +317,64 @@ export function TicTacToe() {
           </div>
         </div>
 
-        {/* Scoreboard */}
-        <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 h-fit ms-5">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-gray-2000">
-              Game Scoreboard
-            </h2>
-          </div>
+        <div className="flex flex-col items-center space-y-6 p-2">
+          {/* Scoreboard */}
+          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 h-fit ms-5">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-gray-2000">
+                Game Scoreboard
+              </h2>
+            </div>
 
-          <div className="mb-4 w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-400">Level</span>
-              <span className="font-semibold text-gray-300">{strategy === "greedy" ? "Easy" : "Hard"}</span>
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-400">Level</span>
+                <span className="font-semibold text-gray-300">
+                  {strategy === "greedy" ? "Easy" : "Hard"}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-400">Player</span>
+                <span className="font-semibold text-gray-300">
+                  {playerName}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Player Wins</span>
+                <span className="font-semibold text-green-400">
+                  {playerWins}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Computer Wins</span>
+                <span className="font-semibold text-blue-400">
+                  {computerWins}
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Draws</span>
+                <span className="font-semibold text-yellow-400">{draws}</span>
+              </div>
             </div>
           </div>
-
-          <div className="mb-4 w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-400">Player</span>
-              <span className="font-semibold text-gray-300">{playerName}</span>
-            </div>
-          </div>
-
-          <div className="mb-4 w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Player Wins</span>
-              <span className="font-semibold text-green-400">{playerWins}</span>
-            </div>
-          </div>
-
-          <div className="mb-4 w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Computer Wins</span>
-              <span className="font-semibold text-blue-400">
-                {computerWins}
-              </span>
-            </div>
-          </div>
-
-          <div className="w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Draws</span>
-              <span className="font-semibold text-yellow-400">{draws}</span>
-            </div>
-          </div>
-
-          
+          <button
+            className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition"
+            onClick={() => setShowHelp(true)}
+          >
+            Help
+          </button>
         </div>
       </div>
     </div>
