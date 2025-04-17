@@ -150,7 +150,7 @@ export function TicTacToe() {
           onChange={(e) => setPlayerName(e.target.value)}
         />
         <div className="flex space-x-4 items-center">
-          <label className="text-sm font-medium">Strategy:</label>
+          <label className="text-sm font-medium">Level:</label>
           <select
             value={strategy}
             onChange={(e) =>
