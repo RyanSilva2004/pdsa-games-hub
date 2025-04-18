@@ -4,7 +4,7 @@ import { PageHeader } from "@/shared/components/page-header";
 import Chessboard from "./components/Chessboard/Chessboard";
 import NameInput from "./components/NameInput/NameInput";
 import { useState } from "react";
-import ErrorBoundary from "./components/ErrorBoundary/ErrorBoundary";
+
 import { Toaster } from "react-hot-toast";
 
 export default function KnightsTourPage() {
@@ -17,7 +17,7 @@ export default function KnightsTourPage() {
         description="Find a sequence of knight moves that visits every square on the chessboard exactly once."
       />
       <div className="mt-12 flex flex-col items-center">
-        <ErrorBoundary>
+      
           {!playerName ? (
             <NameInput onSubmit={(name) => setPlayerName(name)} />
           ) : (
@@ -26,7 +26,7 @@ export default function KnightsTourPage() {
               <Chessboard playerName={playerName} />
             </>
           )}
-        </ErrorBoundary>
+        
       </div>
       <Toaster position="top-center" />
     </main>

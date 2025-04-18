@@ -1,5 +1,5 @@
 import { addDoc, collection } from "firebase/firestore";
-import  {firestore} from "../../../../lib/firebase";
+import  {firestore} from "../../../../../lib/firebase";
 
 interface GameResult {
   playerName: string;

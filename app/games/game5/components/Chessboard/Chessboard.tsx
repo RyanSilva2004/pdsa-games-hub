@@ -4,10 +4,10 @@ import { FC, useState, useEffect, useMemo } from "react";
 import Knight from "../Knight/Knight";
 import GameStatus from "../GameStatus/GameStatus";
 import AlgorithmSelector from "../AlgorithmSelector/AlgorithmSelector";
-import { isValidKnightMove } from "../../util/utils";
-import { solveKnightsTourBacktracking } from "../../logic/backtracking";
-import { solveKnightsTourWarnsdorff } from "../../logic/warnsdorff";
-import { saveGameResult } from "../../util/gameService"
+import { isValidKnightMove } from "../../util/utils/utils";
+import { solveKnightsTourBacktracking } from "../../logic/backtracking/backtracking";
+import { solveKnightsTourWarnsdorff } from "../../logic/warnsdorff/warnsdorff";
+import { saveGameResult } from "../../util/gameService/gameService"
 
 import { toast } from "react-hot-toast";
 
@@ -238,20 +238,21 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
               );
               return (
                 <div
-                  key={`${rowIndex}-${colIndex}`}
-                  className={`w-[50px] h-[50px] ${
-                    gameStatus === "playing" ? "cursor-pointer" : "cursor-default"
-                  } relative ${
-                    isVisited
-                      ? "bg-green-200"
-                      : isValidMove
-                      ? "bg-yellow-200"
-                      : (rowIndex + colIndex) % 2 === 0
-                      ? "bg-white"
-                      : "bg-gray-400"
-                  }`}
-                  onClick={() => handleSquareClick(rowIndex, colIndex)}
-                >
+                key={`${rowIndex}-${colIndex}`}
+                data-testid="chess-square"
+                className={`w-[50px] h-[50px] ${
+                  gameStatus === "playing" ? "cursor-pointer" : "cursor-default"
+                } relative ${
+                  isVisited
+                    ? "bg-green-200"
+                    : isValidMove
+                    ? "bg-yellow-200"
+                    : (rowIndex + colIndex) % 2 === 0
+                    ? "bg-white"
+                    : "bg-gray-400"
+                }`}
+                onClick={() => handleSquareClick(rowIndex, colIndex)}
+              >
                   {isVisited && (
                     <span className="absolute top-0 left-1 text-xs text-black">
                       {visitedOrder.findIndex(move => 
