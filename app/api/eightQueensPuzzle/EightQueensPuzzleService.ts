@@ -1,5 +1,12 @@
 import { firestore as db } from "../../../lib/firebase";
-import { collection, addDoc, getDocs, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  Timestamp,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 
 type Solution = {
   id: string;
@@ -17,7 +24,7 @@ export const addGeneratedSolution = async (
   timeTaken: number
 ) => {
   console.log("Saving to Firestore:", { solution, method, timeTaken });
-  const ref = collection(db, "solutions");
+  const ref = collection(db, "8Queens_solutions");
   const docRef = await addDoc(ref, {
     solution,
     method,
@@ -31,7 +38,7 @@ export const addGeneratedSolution = async (
 };
 
 export const getAllSolutions = async (): Promise<Solution[]> => {
-  const ref = collection(db, "solutions");
+  const ref = collection(db, "8Queens_solutions");
   const snapshot = await getDocs(ref);
 
   return snapshot.docs.map((doc) => {
@@ -44,4 +51,13 @@ export const getAllSolutions = async (): Promise<Solution[]> => {
       ...solutionData,
     };
   });
+};
+
+export const deleteSolution = async (id: string): Promise<void> => {
+  console.log(`Deleting ID: ${id}`);
+
+  const docRef = doc(db, "8Queens_solutions", id);
+  await deleteDoc(docRef);
+
+  console.log(`${id} deleted successfully.`);
 };

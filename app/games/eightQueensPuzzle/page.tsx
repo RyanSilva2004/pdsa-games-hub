@@ -11,6 +11,7 @@ import { CommonContext } from "@/context/Common";
 import { createUser, createGuestUser } from "../../api/user";
 import {
   addGeneratedSolution,
+  deleteSolution,
   getAllSolutions,
 } from "@/app/api/eightQueensPuzzle/EightQueensPuzzleService";
 
@@ -51,6 +52,8 @@ const EightQueensPuzzle = () => {
   const [highestScores, setHighestScores] = useState([]);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [solution, setSolution] = useState<string>("");
+  const [sequentialTime, setSequentialTime] = useState<number | null>(null);
+  const [threadedTime, setThreadedTime] = useState<number | null>(null);
 
   useEffect(() => {
     const worker = new Worker(new URL("./utils/workerThread", import.meta.url));
@@ -228,30 +231,38 @@ const EightQueensPuzzle = () => {
 
   const runWorkerAndSaveSolution = (
     board: number[],
-    method: "threaded" | "sequential",
-    timeTaken: number
+    method: "threaded" | "sequential"
   ) => {
     return new Promise<void>((resolve, reject) => {
       const worker = new Worker(
         new URL("./utils/workerThread", import.meta.url)
       );
-
       const n = board.length;
+
+      const threadStart = performance.now();
+
       worker.postMessage({ n });
 
       worker.onmessage = async (e) => {
         const workerResults: number[][] = e.data;
 
+        const threadEnd = performance.now();
+        const timeTaken = threadEnd - threadStart;
+
+        if (workerResults.length === 0) {
+          reject("No results returned from worker.");
+          worker.terminate();
+          return;
+        }
+
         const solutionStrings = workerResults.map((solution) =>
           solution.join(",")
         );
-        console.log("workerResults length:", workerResults.length);
-        console.log("Method passed to addGeneratedSolution:", method);
+        console.log("Worker results:", solutionStrings);
+
         try {
-          if (workerResults.length === 0) {
-            await addGeneratedSolution(solutionStrings, method, timeTaken);
-            console.log(`${method} solution saved to Firestore.`);
-          }
+          await addGeneratedSolution(solutionStrings, method, timeTaken);
+          console.log(`${method} solution saved to Firestore.`);
           resolve();
         } catch (error) {
           console.error(`Error saving ${method} solution:`, error);
@@ -261,7 +272,11 @@ const EightQueensPuzzle = () => {
         }
       };
 
-      worker.postMessage(board);
+      worker.onerror = (error) => {
+        console.error("Worker encountered an error:", error);
+        reject(error);
+        worker.terminate();
+      };
     });
   };
 
@@ -269,54 +284,53 @@ const EightQueensPuzzle = () => {
     const backtrackingStart = performance.now();
     const backtrackingResults = findAllNQueensSolutions(BOARD_SIZE);
     const backtrackingEnd = performance.now();
-
     const backtrackingTime = backtrackingEnd - backtrackingStart;
 
-    const existingSolutions = await getAllSolutions();
+    let existingSolutions;
+    try {
+      existingSolutions = await getAllSolutions();
 
-    const stringifiedResults = backtrackingResults.results.map((solution) =>
-      solution.join(",")
-    );
+      const stringifiedResults = backtrackingResults.results.map((solution) =>
+        solution.join(",")
+      );
 
-    const existingStringifiedSolutions = existingSolutions.map((solutionDoc) =>
-      solutionDoc.solution.join(",")
-    );
-
-    for (const solution of stringifiedResults) {
-      if (!existingStringifiedSolutions.includes(solution)) {
-        try {
-          await addGeneratedSolution(
-            solution.split(","),
-            "sequential",
-            backtrackingTime
-          );
-          console.log("Backtracking solution saved to Firestore.");
-        } catch (error) {
-          console.error("Error saving backtracking solution:", error);
-        }
+      const existingSequential = existingSolutions.find(
+        (item) => item.method === "sequential"
+      );
+      if (
+        existingSequential &&
+        existingSequential.timeTaken > backtrackingTime
+      ) {
+        await deleteSolution(existingSequential.id);
       }
+
+      if (
+        !existingSequential ||
+        existingSequential.timeTaken > backtrackingTime
+      ) {
+        await addGeneratedSolution(
+          stringifiedResults,
+          "sequential",
+          backtrackingTime
+        );
+      }
+      setSequentialTime(backtrackingTime);
+    } catch (error) {
+      console.error("Error saving backtracking solution:", error);
     }
 
-    const workerStart = performance.now();
-    try {
-      await runWorkerAndSaveSolution(
-        backtrackingResults.results[0],
-        "threaded",
-        backtrackingTime
-      );
-      const workerEnd = performance.now();
+    const existingThreaded = existingSolutions?.find(
+      (item) => item.method === "threaded"
+    );
 
-      const workerTime = workerEnd - workerStart;
-      await addGeneratedSolution(
-        [
-          `Time taken for backtracking: ${backtrackingTime}ms, Time taken for worker: ${workerTime}ms`,
-        ],
-        "comparison",
-        0
-      );
-      console.log("Time comparison saved to Firestore.");
+    if (existingThreaded && existingThreaded.timeTaken > backtrackingTime) {
+      await deleteSolution(existingThreaded.id);
+    }
+
+    try {
+      await runWorkerAndSaveSolution(Array(BOARD_SIZE).fill(-1), "threaded");
     } catch (error) {
-      console.error("Error saving worker solution or time comparison:", error);
+      console.error("Error saving worker solution:", error);
     }
   };
 
