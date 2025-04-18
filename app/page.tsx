@@ -49,7 +49,7 @@ export default function HomePage() {
       description: "Find a sequence of knight moves that visits every square",
       icon: "Castle",
       iconColor: "#EC4899", // Pink color for Knight's Tour icon
-      status: "coming-soon",
+      status: "ready",
       developer: "Keshana",
       path: "/games/game5",
     },
