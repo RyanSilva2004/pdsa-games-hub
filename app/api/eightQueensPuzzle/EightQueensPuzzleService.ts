@@ -8,7 +8,7 @@ import {
   doc,
 } from "firebase/firestore";
 
-type Solution = {
+export type Solution = {
   id: string;
   solution: string[];
   method: "sequential" | "threaded" | "comparison";

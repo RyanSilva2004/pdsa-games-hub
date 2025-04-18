@@ -13,8 +13,13 @@ import {
   addGeneratedSolution,
   deleteSolution,
   getAllSolutions,
+  Solution,
 } from "@/app/api/eightQueensPuzzle/EightQueensPuzzleService";
 
+export enum solutionTypes {
+  THREADED = "threaded",
+  SEQUENTIAL = "sequential",
+}
 type ScoreEntry = {
   name: string;
   time: number;
@@ -51,23 +56,10 @@ const EightQueensPuzzle = () => {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [highestScores, setHighestScores] = useState([]);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
-  const [solution, setSolution] = useState<string>("");
+
   const [sequentialTime, setSequentialTime] = useState<number | null>(null);
   const [threadedTime, setThreadedTime] = useState<number | null>(null);
-
-  useEffect(() => {
-    const worker = new Worker(new URL("./utils/workerThread", import.meta.url));
-
-    worker.onmessage = (e) => {
-      setSolution(e.data);
-    };
-
-    worker.postMessage(board);
-
-    return () => {
-      worker.terminate();
-    };
-  }, [board]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleUser = async () => {
     try {
@@ -229,15 +221,19 @@ const EightQueensPuzzle = () => {
     };
   }, [timerInterval]);
 
-  const runWorkerAndSaveSolution = (
-    board: number[],
-    method: "threaded" | "sequential"
-  ) => {
+  const getFilteredSolutions = async (
+    type: string
+  ): Promise<Solution | undefined> => {
+    const existingSolutions = await getAllSolutions();
+    return existingSolutions.find((item: Solution) => item.method === type);
+  };
+
+  const runWorkerAndSaveSolution = () => {
     return new Promise<void>((resolve, reject) => {
       const worker = new Worker(
         new URL("./utils/workerThread", import.meta.url)
       );
-      const n = board.length;
+      const n = Array(BOARD_SIZE).fill(-1).length;
 
       const threadStart = performance.now();
 
@@ -260,12 +256,29 @@ const EightQueensPuzzle = () => {
         );
         console.log("Worker results:", solutionStrings);
 
+        const existingSolutions = await getFilteredSolutions(
+          solutionTypes.THREADED
+        );
+
+        if (existingSolutions && existingSolutions.timeTaken > timeTaken) {
+          await deleteSolution(existingSolutions.id);
+        } else if (
+          existingSolutions &&
+          existingSolutions.timeTaken < timeTaken
+        ) {
+          return;
+        }
+
         try {
-          await addGeneratedSolution(solutionStrings, method, timeTaken);
-          console.log(`${method} solution saved to Firestore.`);
+          await addGeneratedSolution(
+            solutionStrings,
+            solutionTypes.THREADED,
+            timeTaken
+          );
+          console.log(`threaded solution saved to Firestore.`);
           resolve();
         } catch (error) {
-          console.error(`Error saving ${method} solution:`, error);
+          console.error(`Error saving threaded solution:`, error);
           reject(error);
         } finally {
           worker.terminate();
@@ -288,54 +301,44 @@ const EightQueensPuzzle = () => {
 
     let existingSolutions;
     try {
-      existingSolutions = await getAllSolutions();
+      existingSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
 
       const stringifiedResults = backtrackingResults.results.map((solution) =>
         solution.join(",")
       );
 
-      const existingSequential = existingSolutions.find(
-        (item) => item.method === "sequential"
-      );
       if (
-        existingSequential &&
-        existingSequential.timeTaken > backtrackingTime
-      ) {
-        await deleteSolution(existingSequential.id);
-      }
-
-      if (
-        !existingSequential ||
-        existingSequential.timeTaken > backtrackingTime
+        !existingSolutions ||
+        existingSolutions.timeTaken > backtrackingTime
       ) {
         await addGeneratedSolution(
           stringifiedResults,
-          "sequential",
+          solutionTypes.SEQUENTIAL,
           backtrackingTime
         );
       }
-      setSequentialTime(backtrackingTime);
     } catch (error) {
       console.error("Error saving backtracking solution:", error);
     }
 
-    const existingThreaded = existingSolutions?.find(
-      (item) => item.method === "threaded"
-    );
-
-    if (existingThreaded && existingThreaded.timeTaken > backtrackingTime) {
-      await deleteSolution(existingThreaded.id);
+    if (existingSolutions && existingSolutions.timeTaken > backtrackingTime) {
+      await deleteSolution(existingSolutions.id);
     }
+  };
 
+  const automationCalls = async () => {
     try {
-      await runWorkerAndSaveSolution(Array(BOARD_SIZE).fill(-1), "threaded");
-    } catch (error) {
-      console.error("Error saving worker solution:", error);
+      setIsLoading(true);
+      storeSolutionsIfNew();
+      runWorkerAndSaveSolution();
+    } catch (e) {
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    storeSolutionsIfNew();
+    automationCalls();
   }, []);
 
   return (
