@@ -261,11 +261,13 @@ const EightQueensPuzzle = () => {
         );
 
         if (existingSolutions && existingSolutions.timeTaken > timeTaken) {
+          setSequentialTime(timeTaken);
           await deleteSolution(existingSolutions.id);
         } else if (
           existingSolutions &&
           existingSolutions.timeTaken < timeTaken
         ) {
+          setSequentialTime(existingSolutions.timeTaken);
           return;
         }
 
@@ -298,7 +300,7 @@ const EightQueensPuzzle = () => {
     const backtrackingResults = findAllNQueensSolutions(BOARD_SIZE);
     const backtrackingEnd = performance.now();
     const backtrackingTime = backtrackingEnd - backtrackingStart;
-
+    let latestTimeTaken;
     let existingSolutions;
     try {
       existingSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
@@ -311,19 +313,25 @@ const EightQueensPuzzle = () => {
         !existingSolutions ||
         existingSolutions.timeTaken > backtrackingTime
       ) {
+        latestTimeTaken = backtrackingTime;
         await addGeneratedSolution(
           stringifiedResults,
           solutionTypes.SEQUENTIAL,
           backtrackingTime
         );
+      } else {
+        latestTimeTaken = existingSolutions.timeTaken;
       }
     } catch (error) {
       console.error("Error saving backtracking solution:", error);
+    } finally {
     }
 
     if (existingSolutions && existingSolutions.timeTaken > backtrackingTime) {
       await deleteSolution(existingSolutions.id);
     }
+
+    setThreadedTime(latestTimeTaken || null);
   };
 
   const automationCalls = async () => {
@@ -359,6 +367,19 @@ const EightQueensPuzzle = () => {
             Start Game
           </button>
         )}
+      </div>
+
+      <div className="flex justify-end text-gray-700">
+        <span>Sequential: </span>
+        <span className="font-medium text-blue-600">
+          {sequentialTime?.toFixed(4)}
+        </span>
+      </div>
+      <div className="flex justify-end text-gray-700">
+        <span>Threaded: </span>
+        <span className="font-medium text-green-600">
+          {threadedTime?.toFixed(4)}
+        </span>
       </div>
 
       <div className="flex justify-center mt-8">
