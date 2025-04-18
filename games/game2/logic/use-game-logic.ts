@@ -4,7 +4,11 @@ import { useState, useCallback } from "react"
 import type { City, GameState } from "./types"
 import { GamePhase } from "./types"
 import { AdjacencyMatrix } from "./adjacency-matrix"
-import { bruteForceAlgorithm, nearestNeighborAlgorithm } from "./route-algorithms"
+import { 
+  runAllTspAlgorithms, 
+  getOptimalSolution,
+  TSPResult 
+} from "./route-algorithms"
 
 // Define all possible cities
 const allCities: City[] = [
@@ -41,7 +45,10 @@ export function useGameLogic() {
 
   // Game state
   const [gameState, setGameState] = useState<GameState>(initialGameState)
-  const [optimalRoute, setOptimalRoute] = useState<{ route: string[]; distance: number } | null>(null)
+  
+  // Algorithm results
+  const [algorithmResults, setAlgorithmResults] = useState<TSPResult[]>([])
+  const [optimalRoute, setOptimalRoute] = useState<TSPResult | null>(null)
 
   // Map visualization state
   const [isMapReady, setIsMapReady] = useState(false)
@@ -53,6 +60,7 @@ export function useGameLogic() {
   const resetGame = useCallback(() => {
     setGameState(initialGameState)
     setOptimalRoute(null)
+    setAlgorithmResults([])
   }, [])
 
   // Initialize available cities based on count and create the map
@@ -203,27 +211,27 @@ export function useGameLogic() {
     [gamePhase, adjacencyMatrix, gameState, selectedCities],
   )
 
-  // Calculate the optimal route using our algorithms
+  // Calculate the optimal route using all algorithms
   const calculateOptimalRoute = useCallback(() => {
     if (!adjacencyMatrix || !gameState.homeCity) return null;
 
     // Get the mandatory cities (selected by user)
     const mandatoryCities = selectedCities.map(city => city.id);
     
-    // Use brute force for small instances, or nearest neighbor for larger ones
-    // The brute force algorithm will automatically fall back to nearest neighbor for instances > 9 cities
-    let result;
+    // Run all algorithms and get their results
+    const results = runAllTspAlgorithms(adjacencyMatrix, gameState.homeCity, mandatoryCities);
     
-    if (mandatoryCities.length <= 8) {
-      // Use brute force for optimal results with small number of cities
-      result = bruteForceAlgorithm(adjacencyMatrix, gameState.homeCity, mandatoryCities);
-    } else {
-      // Use nearest neighbor for larger instances
-      result = nearestNeighborAlgorithm(adjacencyMatrix, gameState.homeCity, mandatoryCities);
-    }
+    // Store all algorithm results
+    setAlgorithmResults(results);
     
-    setOptimalRoute(result);
-    return result;
+    // Get the optimal solution from all results
+    const optimal = getOptimalSolution(results);
+    
+    // Store the optimal route
+    setOptimalRoute(optimal);
+    
+    // Return the optimal solution
+    return optimal;
   }, [adjacencyMatrix, gameState.homeCity, selectedCities]);
 
   // Force start a new game
@@ -238,6 +246,7 @@ export function useGameLogic() {
     adjacencyMatrix,
     gameState,
     optimalRoute,
+    algorithmResults, // New: expose algorithm results
     isMapReady,
     initializeGame,
     onMapVisualizationComplete,
@@ -248,6 +257,6 @@ export function useGameLogic() {
     resetGame,
     calculateOptimalRoute,
     forceStartNewGame,
-    setGamePhase, // Added setGamePhase function to the return value
+    setGamePhase,
   }
 }
