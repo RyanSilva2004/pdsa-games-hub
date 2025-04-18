@@ -12,6 +12,7 @@ import { CityMap } from "./city-map"
 import { useGameLogic } from "../logic/use-game-logic"
 import { GamePhase } from "../logic/types"
 import type { City } from "../logic/types"
+import { TSPResult } from "../logic/route-algorithms"
 
 // Route Builder Component for users to enter their solution
 interface RouteBuilderProps {
@@ -215,6 +216,7 @@ export function TravelingSalesmanGame() {
     calculateOptimalRoute,
     forceStartNewGame,
     setGamePhase,
+    algorithmResults,
   } = useGameLogic()
 
   // Start the game after name entry
@@ -773,6 +775,13 @@ export function TravelingSalesmanGame() {
               </div>
             </div>
 
+            {/* Add the Algorithm Performance Table */}
+            {algorithmResults.length > 0 && (
+              <div className="mt-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <AlgorithmPerformance results={algorithmResults} />
+              </div>
+            )}
+
             <div className="mt-4 text-center text-base text-purple-600/70 dark:text-purple-400/70">
               {solutionDistance === (optimalRoute?.distance || 0)
                 ? "Congratulations! You found the optimal route!"
@@ -783,4 +792,49 @@ export function TravelingSalesmanGame() {
       </CardContent>
     </Card>
   )
+}
+
+// In the Completed phase, add a component to display algorithm performance metrics
+function AlgorithmPerformance({ results }: { results: TSPResult[] }) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Algorithm Performance</h3>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-800">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Algorithm</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Distance</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Time (ms)</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+            {results.map((result, index) => (
+              <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}>
+                <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{result.algorithmName}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {result.distance === Infinity ? '-' : `${result.distance} km`}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {result.executionTime === 0 ? '-' : result.executionTime.toFixed(2)}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm">
+                  {result.distance === Infinity ? (
+                    <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">Skipped</Badge>
+                  ) : result.route.length === 0 ? (
+                    <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">Failed</Badge>
+                  ) : result.distance === Math.min(...results.filter(r => r.distance !== Infinity).map(r => r.distance)) ? (
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Optimal</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Valid</Badge>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
