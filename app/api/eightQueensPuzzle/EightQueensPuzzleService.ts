@@ -1,3 +1,8 @@
+import {
+  gameStatusType,
+  SolutionRecognition,
+  solutionTypes,
+} from "@/app/types/gameEnums";
 import { firestore as db } from "../../../lib/firebase";
 import {
   collection,
@@ -7,20 +12,29 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
+import { userType } from "@/app/types/userEnums";
 
 export type Solution = {
   id: string;
   solution: string[];
-  method: "sequential" | "threaded" | "comparison";
+  method: solutionTypes;
   timeTaken: number;
-  foundBy: string;
-  isRecognized: boolean;
-  createdAt: Timestamp;
+  foundBy?: string;
+  isRecognized?: boolean;
+  createdAt?: Timestamp;
+};
+
+export type ScoreEntry = {
+  name: string;
+  time: number;
+  date: string;
+  status: string;
+  moves: string[];
 };
 
 export const addGeneratedSolution = async (
   solution: string[],
-  method: "sequential" | "threaded" | "comparison",
+  method: solutionTypes,
   timeTaken: number
 ) => {
   console.log("Saving to Firestore:", { solution, method, timeTaken });
@@ -60,4 +74,65 @@ export const deleteSolution = async (id: string): Promise<void> => {
   await deleteDoc(docRef);
 
   console.log(`${id} deleted successfully.`);
+};
+
+export const saveGamePlay = async (
+  userName: string,
+  moves: string[],
+  method: solutionTypes,
+  timeTaken: number,
+  status: gameStatusType,
+  userType: userType,
+  solutionType?: SolutionRecognition
+) => {
+  console.log("Saving to Firestore:", { userName, moves, method, timeTaken });
+
+  const ref = collection(db, "8Queens_GameWinners");
+
+  const docRef = await addDoc(ref, {
+    userName,
+    moves,
+    method,
+    timeTaken,
+    foundBy: "system",
+    isRecognized: false,
+    datePlayed: new Date().toLocaleDateString(),
+    createdAt: Timestamp.now(),
+    status,
+    userType,
+    solutionType,
+  });
+
+  return docRef.id;
+};
+
+export const getAllWinningMoves = async (): Promise<ScoreEntry[]> => {
+  const ref = collection(db, "8Queens_GameWinners");
+  const querySnapshot = await getDocs(ref);
+
+  const scores: ScoreEntry[] = [];
+
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    console.log("Fetched doc data:", data);
+
+    if (
+      Array.isArray(data.moves) &&
+      typeof data.userName === "string" &&
+      typeof data.timeTaken === "number" &&
+      typeof data.status === "string"
+    ) {
+      scores.push({
+        name: data.userName,
+        time: data.timeTaken,
+        date: data.datePlayed ?? "",
+        status: data.status,
+        moves: data.moves,
+      });
+    }
+  });
+
+  console.log("Parsed scores:", scores);
+
+  return scores;
 };
