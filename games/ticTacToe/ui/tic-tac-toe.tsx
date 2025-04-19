@@ -141,19 +141,21 @@ export function TicTacToe() {
 
       console.log("Computer game result:", result);
       saveGameWithComputerTiming(result);
+      fetchScores();
     }
   }, [winner]);
 
-  useEffect(() => {
-    async function fetchScores() {
-      const easy = await getTopWinnersToday("easy");
-      const hard = await getTopWinnersToday("hard");
-      setEasyWinners(easy);
-      setHardWinners(hard);
-    }
+  const fetchScores = async () => {
+    const easy = await getTopWinnersToday("easy");
+    const hard = await getTopWinnersToday("hard");
+    setEasyWinners(easy);
+    setHardWinners(hard);
+  };
 
+  useEffect(() => {
     fetchScores();
   }, [strategy]);
+  
 
   if (!playerNameSubmitted) {
     return (
@@ -294,33 +296,44 @@ export function TicTacToe() {
       )}
 
       <div className="flex flex-row space-x-6 items-center">
-        <div className="flex flex-row space-x-6 items-center">
-          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
-            <h2 className="text-xl font-bold text-gray-2000">
-              Top 5 Winners Today 🏆
-            </h2>
-            <div className="grid grid-cols-1 gap-6 mt-4">
-              <div className="mb-4 w-full">
-                <div className="flex justify-between">
-                  {/* <span className="text-sm text-gray-400">
-                    {strategy === "greedy" ? "Easy Level" : "Hard Level"}
-                  </span> */}
-                  <span className="text-sm font-semibold text-gray-600">
-                    {strategy === "greedy" && easyWinners.length > 0
-                      ? `${easyWinners[0].name} - ${easyWinners[0].wins} win${
-                          easyWinners[0].wins > 1 ? "s" : ""
-                        }`
-                      : hardWinners.length > 0
-                      ? `${hardWinners[0].name} - ${hardWinners[0].wins} win${
-                          hardWinners[0].wins > 1 ? "s" : ""
-                        }`
-                      : "No winners yet"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="flex flex-row space-x-6 items-center mr-8">
+  <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64">
+    <h2 className="text-xl font-bold text-gray-2000">
+      Top 5 Winners Today 🏆
+    </h2>
+    <div className="grid grid-cols-1 gap-6 mt-4">
+      <div className="mb-4 w-full">
+        <div className="flex flex-col">
+          {strategy === "greedy" && easyWinners.length > 0 ? (
+            easyWinners.slice(0, 5).map((winner, index) => (
+              <span
+                key={index}
+                className="text-sm font-semibold text-gray-600 mb-2"
+              >
+                {index + 1}. {winner.name} - {winner.wins} win
+                {winner.wins > 1 ? "s" : ""}
+              </span>
+            ))
+          ) : hardWinners.length > 0 ? (
+            hardWinners.slice(0, 5).map((winner, index) => (
+              <span
+                key={index}
+                className="text-sm font-semibold text-gray-600 mb-2"
+              >
+                {index + 1}. {winner.name} - {winner.wins} win
+                {winner.wins > 1 ? "s" : ""}
+              </span>
+            ))
+          ) : (
+            <span className="text-sm font-semibold text-gray-600">
+              No winners yet
+            </span>
+          )}
         </div>
+      </div>
+    </div>
+  </div>
+</div>
 
         {/* Game Board */}
         <div className="flex flex-col items-center space-y-6 p-2">
