@@ -23,6 +23,7 @@ import {
   solutionTypes,
 } from "@/app/types/gameEnums";
 import { userType } from "@/app/types/userEnums";
+import getHintFromSolutions from "./utils/hintFromSolutions";
 
 type ScoreEntry = {
   name: string;
@@ -66,6 +67,15 @@ const EightQueensPuzzle = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isScoreBoardLoading, setIsScoreBoardloading] = useState(false);
   const [isGameEndingLoading, setIsGameEndingLoading] = useState(false);
+  const [allBacktrackSolutions, setAllBacktrackSolutions] = useState<
+    string[] | undefined
+  >([]);
+
+  const [currentHint, setCurrentHint] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+  const [hintCount, setHintCount] = useState(2);
 
   const handleUser = async () => {
     try {
@@ -78,9 +88,7 @@ const EightQueensPuzzle = () => {
       // } else {
       //   throw new Error('Invalid userType provided.');
       // }
-    } catch (e) {
-      console.log("error : ", e);
-    }
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -95,7 +103,6 @@ const EightQueensPuzzle = () => {
     setIsScoreBoardloading(true);
     try {
       const allScores = await getAllWinningMoves();
-      console.log("allScores : ", allScores);
 
       const sortedTopWinners = allScores
         .filter((score) => score.status === "win")
@@ -130,7 +137,6 @@ const EightQueensPuzzle = () => {
     });
     setBoard(updatedBoard);
     setQueenCount(queenCount + 1);
-    console.log("updatedBoard : ", updatedBoard);
 
     if (queenCount === MOVES_LIMIT || emptySlotCount === 0) {
       gameOver(queenCount, emptySlotCount);
@@ -215,7 +221,6 @@ const EightQueensPuzzle = () => {
   };
 
   const gameOver = async (moves: number, emptySlotsCount: number) => {
-    console.log("queenCount : ", queenCount);
     setIsGameEndingLoading(true);
     const finalMoves = filteredMovesOfUser();
 
@@ -256,6 +261,7 @@ const EightQueensPuzzle = () => {
     setIsGameStarted(false);
     setStartTime(null);
     setElapsedTime(0);
+    setHintCount(2);
     if (timerInterval) clearInterval(timerInterval);
   };
 
@@ -336,7 +342,7 @@ const EightQueensPuzzle = () => {
             solutionTypes.THREADED,
             timeTaken
           );
-          console.log(`threaded solution saved to Firestore.`);
+
           resolve();
         } catch (error) {
           console.error(`Error saving threaded solution:`, error);
@@ -408,6 +414,31 @@ const EightQueensPuzzle = () => {
     automationCalls();
   }, []);
 
+  const initialData = async () => {
+    let existingSolutions = await getFilteredSolutions(
+      solutionTypes.SEQUENTIAL
+    );
+    setAllBacktrackSolutions(existingSolutions?.solution);
+  };
+
+  useEffect(() => {
+    initialData();
+  }, []);
+
+  const getTheHint = async () => {
+    if (hintCount > 0) {
+      setHintCount((pre) => pre - 1);
+      if (allBacktrackSolutions) {
+        const hint = getHintFromSolutions(
+          filteredMovesOfUser(),
+          allBacktrackSolutions
+        );
+        setCurrentHint(hint);
+        console.log("next hint : ", hint);
+      }
+    }
+  };
+
   return (
     <main className="container mx-auto px-4 py-8">
       <PageHeader
@@ -463,11 +494,17 @@ const EightQueensPuzzle = () => {
           </button>
           <button
             onClick={() => {
-              console.log("clicked hint");
+              getTheHint();
             }}
             className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 mt-2"
+            disabled={hintCount === 0 || !isGameStarted}
           >
-            Hint
+            Hint <br />
+            <span className="text-white text-xs">
+              {hintCount > 0
+                ? `(${hintCount} remaining)`
+                : `(no hints are remaining)`}
+            </span>
           </button>
         </div>
         {isGameEndingLoading ? (
@@ -495,7 +532,14 @@ const EightQueensPuzzle = () => {
                 return (
                   <button
                     key={`${rowIndex}-${colIndex}`}
-                    className={`w-16 h-16 ${buttonColor} hover:bg-opacity-80 rounded-lg flex items-center justify-center`}
+                    className={`w-16 h-16 ${buttonColor} hover:bg-opacity-80 rounded-lg flex items-center justify-center
+                    ${
+                      currentHint?.row === rowIndex &&
+                      currentHint?.col === colIndex
+                        ? "animate-blink border-4 border-yellow-400"
+                        : ""
+                    }
+                  `}
                     onClick={() => handleClick(rowIndex, colIndex)}
                     disabled={!isGameStarted || cell === 1 || cell === 2}
                   >
