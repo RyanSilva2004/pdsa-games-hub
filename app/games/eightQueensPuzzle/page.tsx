@@ -64,6 +64,8 @@ const EightQueensPuzzle = () => {
   const [sequentialTime, setSequentialTime] = useState<number | null>(null);
   const [threadedTime, setThreadedTime] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isScoreBoardLoading, setIsScoreBoardloading] = useState(false);
+  const [isGameEndingLoading, setIsGameEndingLoading] = useState(false);
 
   const handleUser = async () => {
     try {
@@ -89,8 +91,9 @@ const EightQueensPuzzle = () => {
     // handleUser();
   }, []);
 
-  useEffect(() => {
-    const fetchScores = async () => {
+  const fetchScores = async () => {
+    setIsScoreBoardloading(true);
+    try {
       const allScores = await getAllWinningMoves();
       console.log("allScores : ", allScores);
 
@@ -100,8 +103,13 @@ const EightQueensPuzzle = () => {
         .slice(0, 10);
 
       setHighestScores(sortedTopWinners);
-    };
+    } catch (e) {
+    } finally {
+      setIsScoreBoardloading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchScores();
   }, []);
 
@@ -208,7 +216,7 @@ const EightQueensPuzzle = () => {
 
   const gameOver = async (moves: number, emptySlotsCount: number) => {
     console.log("queenCount : ", queenCount);
-
+    setIsGameEndingLoading(true);
     const finalMoves = filteredMovesOfUser();
 
     if (queenCount + 1 === BOARD_SIZE) {
@@ -235,7 +243,7 @@ const EightQueensPuzzle = () => {
       setIsModalOpen(true);
       setGameMessage("Game over! You are out of moves.");
     }
-
+    setIsGameEndingLoading(false);
     if (timerInterval) clearInterval(timerInterval);
   };
 
@@ -462,29 +470,44 @@ const EightQueensPuzzle = () => {
             Hint
           </button>
         </div>
-        <div className="grid grid-cols-8 gap-2">
-          {board.map((row, rowIndex) =>
-            row.map((cell, colIndex) => {
-              let buttonColor = "bg-gray-200";
-              if (cell === 1) {
-                buttonColor = "bg-[#03c300]";
-              } else if (cell === 2) {
-                buttonColor = "bg-[#bff3c4]";
-              }
+        {isGameEndingLoading ? (
+          <div className="grid grid-cols-8 gap-2">
+            {Array.from({ length: 8 }).map((_, rowIndex) =>
+              Array.from({ length: 8 }).map((_, colIndex) => (
+                <div
+                  key={`loader-${rowIndex}-${colIndex}`}
+                  className="w-16 h-16 bg-gray-300 rounded-lg animate-pulse"
+                ></div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-8 gap-2">
+            {board.map((row, rowIndex) =>
+              row.map((cell, colIndex) => {
+                let buttonColor = "bg-gray-200";
+                if (cell === 1) {
+                  buttonColor = "bg-[#03c300]";
+                } else if (cell === 2) {
+                  buttonColor = "bg-[#bff3c4]";
+                }
 
-              return (
-                <button
-                  key={`${rowIndex}-${colIndex}`}
-                  className={`w-16 h-16 ${buttonColor} hover:bg-opacity-80 rounded-lg flex items-center justify-center`}
-                  onClick={() => handleClick(rowIndex, colIndex)}
-                  disabled={!isGameStarted || cell === 1 || cell === 2}
-                >
-                  {cell === 1 ? <QueenIcon size={25} color="#ffffff" /> : null}
-                </button>
-              );
-            })
-          )}
-        </div>
+                return (
+                  <button
+                    key={`${rowIndex}-${colIndex}`}
+                    className={`w-16 h-16 ${buttonColor} hover:bg-opacity-80 rounded-lg flex items-center justify-center`}
+                    onClick={() => handleClick(rowIndex, colIndex)}
+                    disabled={!isGameStarted || cell === 1 || cell === 2}
+                  >
+                    {cell === 1 ? (
+                      <QueenIcon size={25} color="#ffffff" />
+                    ) : null}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
         <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-800">Game Scoreboard</h2>
@@ -516,28 +539,76 @@ const EightQueensPuzzle = () => {
           </div>
 
           <div className="w-full border-t pt-4 mt-2">
-            <h3 className="text-md font-semibold text-gray-700 mb-2">
-              Top 10 Scores
-            </h3>
-            {highestScores && highestScores.length > 0 ? (
-              <div className="space-y-2">
-                {highestScores
-                  .slice(0, 10)
-                  .map((score: ScoreEntry, index: number) => (
-                    <div
-                      key={index}
-                      className="flex justify-between text-sm text-gray-700"
-                    >
-                      <span className="w-1/3 truncate">{score.name}</span>
-                      <span className="w-1/3 text-center">{score.time}s</span>
-                      <span className="w-1/3 text-right">{score.date}</span>
-                    </div>
-                  ))}
+            {isScoreBoardLoading ? (
+              <div
+                role="status"
+                className="max-w-md p-4 space-y-4 border border-gray-200 divide-y divide-gray-200 rounded-sm shadow-sm animate-pulse dark:divide-gray-700 md:p-6 dark:border-gray-700"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-24 mb-2.5"></div>
+                    <div className="w-32 h-2 bg-gray-200 rounded-full dark:bg-gray-700"></div>
+                  </div>
+                  <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-700 w-12"></div>
+                </div>
+                <div className="flex items-center justify-between pt-4">
+                  <div>
+                    <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-24 mb-2.5"></div>
+                    <div className="w-32 h-2 bg-gray-200 rounded-full dark:bg-gray-700"></div>
+                  </div>
+                  <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-700 w-12"></div>
+                </div>
+                <div className="flex items-center justify-between pt-4">
+                  <div>
+                    <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-24 mb-2.5"></div>
+                    <div className="w-32 h-2 bg-gray-200 rounded-full dark:bg-gray-700"></div>
+                  </div>
+                  <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-700 w-12"></div>
+                </div>
+                <div className="flex items-center justify-between pt-4">
+                  <div>
+                    <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-24 mb-2.5"></div>
+                    <div className="w-32 h-2 bg-gray-200 rounded-full dark:bg-gray-700"></div>
+                  </div>
+                  <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-700 w-12"></div>
+                </div>
+                <div className="flex items-center justify-between pt-4">
+                  <div>
+                    <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-24 mb-2.5"></div>
+                    <div className="w-32 h-2 bg-gray-200 rounded-full dark:bg-gray-700"></div>
+                  </div>
+                  <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-700 w-12"></div>
+                </div>
+                <span className="sr-only">Loading...</span>
               </div>
             ) : (
-              <div className="text-sm text-gray-500 italic">
-                No scores recorded yet
-              </div>
+              <>
+                <h3 className="text-md font-semibold text-gray-700 mb-2">
+                  Top 10 Scores
+                </h3>
+                {highestScores && highestScores.length > 0 ? (
+                  <div className="space-y-2">
+                    {highestScores
+                      .slice(0, 10)
+                      .map((score: ScoreEntry, index: number) => (
+                        <div
+                          key={index}
+                          className="flex justify-between text-sm text-gray-700"
+                        >
+                          <span className="w-1/3 truncate">{score.name}</span>
+                          <span className="w-1/3 text-center">
+                            {score.time}s
+                          </span>
+                          <span className="w-1/3 text-right">{score.date}</span>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 italic">
+                    No scores recorded yet
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
