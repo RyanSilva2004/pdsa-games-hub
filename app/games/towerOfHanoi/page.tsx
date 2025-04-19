@@ -67,14 +67,28 @@ export default class TowerOfHanoi extends Component<Props, State> {
 
   saveGameToDB = async (playerName: string, moves: number, timeTaken: number) => {
     try {
-      const response = await axios.post("/api/towerOfHanoi/saveGame", {
-        playerName,
-        moves,
-        timeTaken,
-      });
-      console.log("Game saved:", response.data);
+      console.log("Saving game results:", { playerName, moves, timeTaken });
+      
+      const response = await axios.post(
+        "/api/towerOfHanoi",
+        {
+          playerName,
+          moves,
+          timeTaken,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      console.log("Save response:", response.data);
+      return response.data;
+  
     } catch (error) {
       console.error("Error saving game:", error);
+      throw error;
     }
   };
 
@@ -210,17 +224,27 @@ export default class TowerOfHanoi extends Component<Props, State> {
   checkWinCondition = () => {
     if (this.state.pegs[2].length === NUM_DISKS) {
       const timeTaken = this.state.elapsedTime;
-      this.saveGameToDB(this.state.playerName, this.state.moveCount, timeTaken);
-      
-      this.setState({
-        isModalOpen: true,
-        gameMessage: "You won!",
-        isGameStarted: false,
-      });
+      this.saveGameToDB(this.state.playerName, this.state.moveCount, timeTaken)
+        .then(() => {
+          this.setState({
+            isModalOpen: true,
+            gameMessage: "You won!",
+            isGameStarted: false,
+          });
+        })
+        .catch((error) => {
+          console.error("Failed to save game:", error);
+          // Still show win message even if save fails
+          this.setState({
+            isModalOpen: true,
+            gameMessage: "You won! (Score not saved)",
+            isGameStarted: false,
+          });
+        });
+  
       if (this.timerInterval) clearInterval(this.timerInterval);
     }
   };
-
   render() {
     return (
       <main className="container mx-auto px-4 py-8">
