@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { firestore as db } from "@/lib/firebase";
 
 export async function savePlayerWinResult(data: any) {
@@ -6,7 +6,8 @@ export async function savePlayerWinResult(data: any) {
     const resultToSave = {
         ...data,
         board: JSON.stringify(data.board), 
-        playerMoves: JSON.stringify(data.playerMoves), 
+        playerMoves: JSON.stringify(data.playerMoves),
+        timestamp: Timestamp.now(),
       };
     await addDoc(collection(db, "TTT_playerWins"), resultToSave);
     console.log("Player win result saved successfully:", resultToSave);
