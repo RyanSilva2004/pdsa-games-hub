@@ -13,13 +13,17 @@ import {
   addGeneratedSolution,
   deleteSolution,
   getAllSolutions,
+  getAllWinningMoves,
+  saveGamePlay,
   Solution,
 } from "@/app/api/eightQueensPuzzle/EightQueensPuzzleService";
+import {
+  gameStatusType,
+  SolutionRecognition,
+  solutionTypes,
+} from "@/app/types/gameEnums";
+import { userType } from "@/app/types/userEnums";
 
-export enum solutionTypes {
-  THREADED = "threaded",
-  SEQUENTIAL = "sequential",
-}
 type ScoreEntry = {
   name: string;
   time: number;
@@ -54,7 +58,7 @@ const EightQueensPuzzle = () => {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  const [highestScores, setHighestScores] = useState([]);
+  const [highestScores, setHighestScores] = useState<ScoreEntry[]>([]);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
 
   const [sequentialTime, setSequentialTime] = useState<number | null>(null);
@@ -85,6 +89,22 @@ const EightQueensPuzzle = () => {
     // handleUser();
   }, []);
 
+  useEffect(() => {
+    const fetchScores = async () => {
+      const allScores = await getAllWinningMoves();
+      console.log("allScores : ", allScores);
+
+      const sortedTopWinners = allScores
+        .filter((score) => score.status === "win")
+        .sort((a, b) => a.time - b.time)
+        .slice(0, 10);
+
+      setHighestScores(sortedTopWinners);
+    };
+
+    fetchScores();
+  }, []);
+
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
     const seconds = timeInSeconds % 60;
@@ -102,6 +122,7 @@ const EightQueensPuzzle = () => {
     });
     setBoard(updatedBoard);
     setQueenCount(queenCount + 1);
+    console.log("updatedBoard : ", updatedBoard);
 
     if (queenCount === MOVES_LIMIT || emptySlotCount === 0) {
       gameOver(queenCount, emptySlotCount);
@@ -145,23 +166,75 @@ const EightQueensPuzzle = () => {
     return emptySlotCount;
   };
 
-  const gameOver = (moves: number, emptySlotsCount: number) => {
+  const filteredMovesOfUser = () => {
+    let finalMoves: number[] = [];
+    finalMoves = board.map((row) => row.indexOf(1));
+
+    const finalMovesStr: string[] = finalMoves.map(String);
+
+    return finalMovesStr;
+  };
+
+  const isSolutionValidate = async (): Promise<boolean> => {
+    const allWinningMoves = await getAllWinningMoves();
+    const userMoves = filteredMovesOfUser();
+
+    const currentStr = JSON.stringify(userMoves);
+
+    return allWinningMoves.some(
+      (entry: any) => JSON.stringify(entry.moves) === currentStr
+    );
+  };
+
+  const handleGamePlay = async (
+    finalMoves: string[],
+    solutionType: SolutionRecognition,
+    gameStatus: gameStatusType
+  ) => {
+    try {
+      const userId = await saveGamePlay(
+        playerName,
+        finalMoves,
+        solutionTypes.GAME_PLAY,
+        elapsedTime,
+        gameStatus,
+        userType.GUEST_USER,
+        solutionType
+      );
+    } catch (e) {
+    } finally {
+    }
+  };
+
+  const gameOver = async (moves: number, emptySlotsCount: number) => {
     console.log("queenCount : ", queenCount);
 
+    const finalMoves = filteredMovesOfUser();
+
     if (queenCount + 1 === BOARD_SIZE) {
+      const isKnownSolution = await isSolutionValidate();
+
       setIsModalOpen(true);
-      setGameMessage("You won!");
+      setGameMessage(
+        isKnownSolution ? "This solution already exists!" : "You won!"
+      );
+
+      await handleGamePlay(
+        finalMoves,
+        isKnownSolution
+          ? SolutionRecognition.Known
+          : SolutionRecognition.Unique,
+        gameStatusType.WIN
+      );
     } else {
+      await handleGamePlay(
+        finalMoves,
+        SolutionRecognition.Variation,
+        gameStatusType.LOST
+      );
       setIsModalOpen(true);
       setGameMessage("Game over! You are out of moves.");
     }
-
-    updateUserGameHistory({
-      playerName,
-      board,
-      elapsedTime,
-      gameMessage,
-    });
 
     if (timerInterval) clearInterval(timerInterval);
   };
@@ -192,27 +265,6 @@ const EightQueensPuzzle = () => {
     }, 1000);
 
     setTimerInterval(interval);
-  };
-
-  const updateUserGameHistory = (data: userGameSummary) => {};
-
-  const sendGameDataToServer = async () => {
-    const gameData: userGameSummary = {
-      playerName,
-      moves: board,
-      timeTaken: elapsedTime.toString(),
-      result: gameMessage.includes("won") ? "win" : "lose",
-    };
-
-    try {
-      await fetch("/api/save-game", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(gameData),
-      });
-    } catch (error) {
-      console.error("Error saving game data:", error);
-    }
   };
 
   useEffect(() => {
@@ -254,7 +306,6 @@ const EightQueensPuzzle = () => {
         const solutionStrings = workerResults.map((solution) =>
           solution.join(",")
         );
-        console.log("Worker results:", solutionStrings);
 
         const existingSolutions = await getFilteredSolutions(
           solutionTypes.THREADED
