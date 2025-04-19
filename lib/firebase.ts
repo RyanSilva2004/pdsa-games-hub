@@ -10,8 +10,21 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only once to prevent multiple instances in the app
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const firestore = getFirestore(app);
+// Debugging
+console.log("Firebase Config:", {
+  ...firebaseConfig,
+  apiKey: firebaseConfig.apiKey ? "***" : "MISSING"
+});
+
+let app;
+let firestore;
+
+try {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  firestore = getFirestore(app);
+  console.log("Firestore initialized successfully");
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+}
 
 export { firestore };
