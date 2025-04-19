@@ -18,6 +18,7 @@ import Image from "next/image";
 import {
   savePlayerWinResult,
   saveGameWithComputerTiming,
+  getTopWinnersToday,
 } from "../utils/dbLogger";
 
 export function TicTacToe() {
@@ -38,6 +39,8 @@ export function TicTacToe() {
   const [computerWins, setComputerWins] = useState(0);
   const [draws, setDraws] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
+  const [easyWinners, setEasyWinners] = useState([]);
+  const [hardWinners, setHardWinners] = useState([]);
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || winner || !isHumanTurn) return;
@@ -140,6 +143,17 @@ export function TicTacToe() {
       saveGameWithComputerTiming(result);
     }
   }, [winner]);
+
+  useEffect(() => {
+    async function fetchScores() {
+      const easy = await getTopWinnersToday("easy");
+      const hard = await getTopWinnersToday("hard");
+      setEasyWinners(easy);
+      setHardWinners(hard);
+    }
+
+    fetchScores();
+  }, [strategy]);
 
   if (!playerNameSubmitted) {
     return (
@@ -244,7 +258,9 @@ export function TicTacToe() {
       {showHelp && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-80 text-center shadow-lg relative">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">How to Play</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              How to Play
+            </h2>
             <p className="text-sm text-gray-600 mb-4">
               <b>Welcome to 5x5 Tic Tac Toe!</b>
               <br />
@@ -278,6 +294,34 @@ export function TicTacToe() {
       )}
 
       <div className="flex flex-row space-x-6 items-center">
+        <div className="flex flex-row space-x-6 items-center">
+          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
+            <h2 className="text-xl font-bold text-gray-2000">
+              Top 5 Winners Today 🏆
+            </h2>
+            <div className="grid grid-cols-1 gap-6 mt-4">
+              <div className="mb-4 w-full">
+                <div className="flex justify-between">
+                  {/* <span className="text-sm text-gray-400">
+                    {strategy === "greedy" ? "Easy Level" : "Hard Level"}
+                  </span> */}
+                  <span className="text-sm font-semibold text-gray-600">
+                    {strategy === "greedy" && easyWinners.length > 0
+                      ? `${easyWinners[0].name} - ${easyWinners[0].wins} win${
+                          easyWinners[0].wins > 1 ? "s" : ""
+                        }`
+                      : hardWinners.length > 0
+                      ? `${hardWinners[0].name} - ${hardWinners[0].wins} win${
+                          hardWinners[0].wins > 1 ? "s" : ""
+                        }`
+                      : "No winners yet"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Game Board */}
         <div className="flex flex-col items-center space-y-6 p-2">
           <div className="grid grid-cols-5 gap-1 mt-6">
@@ -319,8 +363,8 @@ export function TicTacToe() {
 
         <div className="flex flex-col items-center space-y-6 p-2">
           {/* Scoreboard */}
-          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 h-fit ms-5">
-            <div className="text-center mb-6">
+          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
+            <div className="text-center mb-4">
               <h2 className="text-xl font-bold text-gray-2000">
                 Game Scoreboard
               </h2>
