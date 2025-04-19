@@ -118,7 +118,7 @@ const EightQueensPuzzle = () => {
 
   useEffect(() => {
     fetchScores();
-  }, []);
+  }, [isGameEndingLoading]);
 
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
