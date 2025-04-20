@@ -146,8 +146,8 @@ export function TicTacToe() {
   }, [winner]);
 
   const fetchScores = async () => {
-    const easy = await getTopWinnersToday("easy");
-    const hard = await getTopWinnersToday("hard");
+    const easy = await getTopWinnersToday(strategy);
+    const hard = await getTopWinnersToday(strategy);
     setEasyWinners(easy);
     setHardWinners(hard);
   };
@@ -155,7 +155,6 @@ export function TicTacToe() {
   useEffect(() => {
     fetchScores();
   }, [strategy]);
-  
 
   if (!playerNameSubmitted) {
     return (
@@ -170,27 +169,9 @@ export function TicTacToe() {
           value={playerName}
           onChange={(e) => setPlayerName(e.target.value)}
         />
-        <div className="flex space-x-4 items-center">
-          <label className="text-sm font-medium">Level:</label>
-          <select
-            value={strategy}
-            onChange={(e) =>
-              setStrategy(e.target.value as "minimax" | "greedy")
-            }
-            className="border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="greedy">Easy</option>
-            <option value="minimax">Hard</option>
-          </select>
-        </div>
         <button
-          className="px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-300"
-          onClick={() => {
-            if (playerName.trim()) {
-              setPlayerNameSubmitted(true);
-              setStartTime(new Date());
-            }
-          }}
+          className="px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={() => setPlayerNameSubmitted(true)}
         >
           Start Game
         </button>
@@ -296,44 +277,61 @@ export function TicTacToe() {
       )}
 
       <div className="flex flex-row space-x-6 items-center">
-      <div className="flex flex-row space-x-6 items-center mr-8">
-  <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64">
-    <h2 className="text-xl font-bold text-gray-2000">
-      Top 5 Winners Today 🏆
-    </h2>
-    <div className="grid grid-cols-1 gap-6 mt-4">
-      <div className="mb-4 w-full">
-        <div className="flex flex-col">
-          {strategy === "greedy" && easyWinners.length > 0 ? (
-            easyWinners.slice(0, 5).map((winner, index) => (
-              <span
-                key={index}
-                className="text-sm font-semibold text-gray-600 mb-2"
-              >
-                {index + 1}. {winner.name} - {winner.wins} win
-                {winner.wins > 1 ? "s" : ""}
-              </span>
-            ))
-          ) : hardWinners.length > 0 ? (
-            hardWinners.slice(0, 5).map((winner, index) => (
-              <span
-                key={index}
-                className="text-sm font-semibold text-gray-600 mb-2"
-              >
-                {index + 1}. {winner.name} - {winner.wins} win
-                {winner.wins > 1 ? "s" : ""}
-              </span>
-            ))
-          ) : (
-            <span className="text-sm font-semibold text-gray-600">
-              No winners yet
-            </span>
-          )}
+        <div className="flex flex-col items-center space-y-6 p-2">
+          <div className="flex space-x-4 items-center mt-4">
+            <label className="text-sm font-medium">Level:</label>
+            <select
+              value={strategy}
+              onChange={(e) => {
+                setStrategy(e.target.value as "minimax" | "greedy");
+                resetGame();
+              }}
+              className="border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="greedy">Easy</option>
+              <option value="minimax">Hard</option>
+            </select>
+          </div>
+
+          <div className="flex flex-row space-x-6 items-center mr-8">
+            <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64">
+              <h2 className="text-xl font-bold text-gray-2000">
+                Top 5 Winners Today 🏆
+              </h2>
+              <div className="grid grid-cols-1 gap-6 mt-4">
+                <div className="mb-4 w-full">
+                  <div className="flex flex-col">
+                    {strategy === "greedy" && easyWinners.length > 0 ? (
+                      easyWinners.slice(0, 5).map((winner, index) => (
+                        <span
+                          key={index}
+                          className="text-sm font-semibold text-gray-600 mb-2"
+                        >
+                          {index + 1}. {winner.name} - {winner.wins} win
+                          {winner.wins > 1 ? "s" : ""}
+                        </span>
+                      ))
+                    ) : hardWinners.length > 0 ? (
+                      hardWinners.slice(0, 5).map((winner, index) => (
+                        <span
+                          key={index}
+                          className="text-sm font-semibold text-gray-600 mb-2"
+                        >
+                          {index + 1}. {winner.name} - {winner.wins} win
+                          {winner.wins > 1 ? "s" : ""}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm font-semibold text-gray-600">
+                        No winners yet
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-</div>
 
         {/* Game Board */}
         <div className="flex flex-col items-center space-y-6 p-2">
