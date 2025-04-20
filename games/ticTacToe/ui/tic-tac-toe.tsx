@@ -315,8 +315,8 @@ export function TicTacToe() {
           </div>
 
           <div className="flex flex-row space-x-6 items-center mr-8">
-            <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64">
-              <h2 className="text-xl font-bold text-gray-2000">
+            <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-64 ms-5 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
+              <h2 className="text-xl font-bold text-gray-200">
                 Top 5 Winners Today 🏆
               </h2>
               <div className="grid grid-cols-1 gap-6 mt-4">
@@ -330,7 +330,7 @@ export function TicTacToe() {
                       easyWinners.slice(0, 5).map((winner, index) => (
                         <span
                           key={index}
-                          className="text-sm font-semibold text-gray-600 mb-2"
+                          className="text-sm font-semibold text-gray-500 mb-2"
                         >
                           {index + 1}. {winner.name} - {winner.wins} win
                           {winner.wins > 1 ? "s" : ""}
@@ -340,14 +340,14 @@ export function TicTacToe() {
                       hardWinners.slice(0, 5).map((winner, index) => (
                         <span
                           key={index}
-                          className="text-sm font-semibold text-gray-600 mb-2"
+                          className="text-sm font-semibold text-gray-500 mb-2"
                         >
                           {index + 1}. {winner.name} - {winner.wins} win
                           {winner.wins > 1 ? "s" : ""}
                         </span>
                       ))
                     ) : (
-                      <span className="text-sm font-semibold text-gray-600">
+                      <span className="text-sm font-semibold text-gray-500">
                         No winners yet
                       </span>
                     )}
@@ -378,7 +378,7 @@ export function TicTacToe() {
           <div className="flex space-x-6 mt-6">
             <button
               onClick={resetGame}
-              className="px-6 py-3 bg-green-500 text-white rounded hover:bg-green-600 transition duration-300"
+              className="px-6 py-3 bg-green-600 text-white rounded hover:bg-green-700 transition duration-300"
             >
               Restart Game
             </button>
@@ -399,7 +399,7 @@ export function TicTacToe() {
 
         <div className="flex flex-col items-center space-y-6 p-2">
           {/* Scoreboard */}
-          <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
+          <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-64 ms-5 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
             <div className="text-center mb-4">
               <h2 className="text-xl font-bold text-gray-2000">
                 Game Scoreboard
