@@ -41,6 +41,7 @@ export function TicTacToe() {
   const [showHelp, setShowHelp] = useState(false);
   const [easyWinners, setEasyWinners] = useState([]);
   const [hardWinners, setHardWinners] = useState([]);
+  const [isLoadingWinners, setIsLoadingWinners] = useState(false);
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || winner || !isHumanTurn) return;
@@ -146,10 +147,15 @@ export function TicTacToe() {
   }, [winner]);
 
   const fetchScores = async () => {
-    const easy = await getTopWinnersToday(strategy);
-    const hard = await getTopWinnersToday(strategy);
-    setEasyWinners(easy);
-    setHardWinners(hard);
+    setIsLoadingWinners(true);
+    try {
+      const easy = await getTopWinnersToday(strategy);
+      const hard = await getTopWinnersToday(strategy);
+      setEasyWinners(easy);
+      setHardWinners(hard);
+    } finally {
+      setIsLoadingWinners(false);
+    }
   };
 
   useEffect(() => {
@@ -278,19 +284,34 @@ export function TicTacToe() {
 
       <div className="flex flex-row space-x-6 items-center">
         <div className="flex flex-col items-center space-y-6 p-2">
-          <div className="flex space-x-4 items-center">
-            <label className="text-sm font-medium">Level:</label>
-            <select
-              value={strategy}
-              onChange={(e) => {
-                setStrategy(e.target.value as "minimax" | "greedy");
-                resetGame();
-              }}
-              className="border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <div className="flex items-center space-x-4">
+            <span
+              className={`text-sm font-medium ${
+                strategy === "greedy" ? "text-green-500" : "text-gray-400"
+              }`}
             >
-              <option value="greedy">Easy</option>
-              <option value="minimax">Hard</option>
-            </select>
+              Easy
+            </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={strategy === "minimax"}
+                onChange={(e) => {
+                  const newStrategy = e.target.checked ? "minimax" : "greedy";
+                  setStrategy(newStrategy);
+                  resetGame();
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+            <span
+              className={`text-sm font-medium ${
+                strategy === "minimax" ? "text-red-500" : "text-gray-400"
+              }`}
+            >
+              Hard
+            </span>
           </div>
 
           <div className="flex flex-row space-x-6 items-center mr-8">
@@ -301,7 +322,11 @@ export function TicTacToe() {
               <div className="grid grid-cols-1 gap-6 mt-4">
                 <div className="mb-4 w-full">
                   <div className="flex flex-col">
-                    {strategy === "greedy" && easyWinners.length > 0 ? (
+                    {isLoadingWinners ? (
+                      <div className="flex justify-center items-center h-20">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
+                      </div>
+                    ) : strategy === "greedy" && easyWinners.length > 0 ? (
                       easyWinners.slice(0, 5).map((winner, index) => (
                         <span
                           key={index}
