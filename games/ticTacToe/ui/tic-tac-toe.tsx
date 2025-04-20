@@ -39,8 +39,8 @@ export function TicTacToe() {
   const [computerWins, setComputerWins] = useState(0);
   const [draws, setDraws] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
-  const [easyWinners, setEasyWinners] = useState([]);
-  const [hardWinners, setHardWinners] = useState([]);
+  const [easyWinners, setEasyWinners] = useState<{ name: string; wins: number }[]>([]);
+  const [hardWinners, setHardWinners] = useState<{ name: string; wins: number }[]>([]);
   const [isLoadingWinners, setIsLoadingWinners] = useState(false);
 
   const handleClick = (row: number, col: number) => {
