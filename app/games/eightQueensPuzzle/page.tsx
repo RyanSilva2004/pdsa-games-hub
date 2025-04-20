@@ -120,6 +120,7 @@ const EightQueensPuzzle = () => {
     col: number;
   } | null>(null);
   const [hintCount, setHintCount] = useState(2);
+  const [hintVislbe, setHintVislbe] = useState(true);
 
   const handleUser = async () => {
     try {
@@ -318,7 +319,13 @@ const EightQueensPuzzle = () => {
         gameStatusType.LOST
       );
       setIsModalOpen(true);
-      setGameMessage("Game over! You are out of moves.");
+      const emptySlots = countEmptySlots();
+
+      if (emptySlots === 1) {
+        setGameMessage("Game over! So close! Only one move left.");
+      } else if (emptySlots > 0) {
+        setGameMessage("Game over! You are out of moves.");
+      }
     }
     setIsGameEndingLoading(false);
     if (timerInterval) clearInterval(timerInterval);
@@ -334,6 +341,7 @@ const EightQueensPuzzle = () => {
     setStartTime(null);
     setElapsedTime(0);
     setHintCount(2);
+    setHintVislbe(false);
     if (timerInterval) clearInterval(timerInterval);
   };
 
@@ -502,6 +510,7 @@ const EightQueensPuzzle = () => {
   }, []);
 
   const getTheHint = async () => {
+    setHintVislbe(true);
     if (hintCount > 0) {
       setHintCount((pre) => pre - 1);
       if (allBacktrackSolutions) {
@@ -667,9 +676,13 @@ const EightQueensPuzzle = () => {
                   <button
                     key={`${rowIndex}-${colIndex}`}
                     className={`w-16 h-16 ${buttonStyle} rounded-xl flex items-center justify-center transition-all duration-300 transform hover:scale-105
-            ${isHint ? "animate-blink ring-4 ring-yellow-400" : ""}
+            ${
+              isHint && hintVislbe ? "animate-blink ring-4 ring-yellow-400" : ""
+            }
           `}
-                    onClick={() => handleClick(rowIndex, colIndex)}
+                    onClick={() => {
+                      handleClick(rowIndex, colIndex), setHintVislbe(true);
+                    }}
                     disabled={!isGameStarted || cell === 1 || cell === 2}
                   >
                     {queen}
