@@ -13,6 +13,10 @@ import { useGameLogic } from "../logic/use-game-logic"
 import { GamePhase } from "../logic/types"
 import type { City } from "../logic/types"
 import { TSPResult } from "../logic/route-algorithms"
+import { TSPGameService } from "@/app/api/travelingSalesman/TSPGameService"
+
+// Initialize the game service
+const gameService = new TSPGameService();
 
 // Route Builder Component for users to enter their solution
 interface RouteBuilderProps {
@@ -329,7 +333,7 @@ export function TravelingSalesmanGame() {
   }
 
   // Handle user route submission
-  const handleRouteSubmit = (route: string[]) => {
+  const handleRouteSubmit = async (route: string[]) => {
     if (!adjacencyMatrix) return;
 
     // Calculate the distance of user's route
@@ -362,6 +366,42 @@ export function TravelingSalesmanGame() {
         
         // Show the optimal route immediately if the user's solution is wrong
         setShowOptimalRoute(true);
+      }
+      
+      try {
+        // Get the next game round number
+        const nextGameRound = await gameService.getLatestGameRound() + 1;
+        
+        // Save game result to Firebase
+        const gameResult = {
+          playerName,
+          homeCity: gameState.homeCity || "",
+          selectedCities: selectedCities.map(city => city.id),
+          optimalRoute: optimal.route,
+          optimalDistance: optimal.distance,
+          correct: isOptimal,
+          playerDistance: distance,
+          gameRound: nextGameRound
+        };
+        
+        await gameService.saveGameResult(gameResult);
+        console.log("Game result saved successfully to Firebase!");
+        
+        // Save algorithm performance data to Firebase - make this a separate try/catch
+        try {
+          if (algorithmResults.length > 0) {
+            const perfResults = await gameService.saveAlgorithmPerformance(
+              algorithmResults,
+              nextGameRound,
+              optimal.distance
+            );
+            console.log(`Algorithm performance data saved: ${perfResults.length} records`);
+          }
+        } catch (perfError) {
+          console.error("Error saving algorithm performance:", perfError);
+        }
+      } catch (error) {
+        console.error("Error saving game data:", error);
       }
     } else {
       setMessage({
@@ -817,7 +857,9 @@ function AlgorithmPerformance({ results }: { results: TSPResult[] }) {
                   {result.distance === Infinity ? '-' : `${result.distance} km`}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                  {result.executionTime === 0 ? '-' : result.executionTime.toFixed(2)}
+                  {result.executionTime === 0 ? '-' : 
+                   result.executionTime < 0.01 ? '< 0.01' : 
+                   result.executionTime.toFixed(2)}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-sm">
                   {result.distance === Infinity ? (

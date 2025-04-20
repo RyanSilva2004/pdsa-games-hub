@@ -223,7 +223,8 @@ export function branchAndBoundAlgorithm(
   );
   
   const endTime = performance.now();
-  const executionTime = endTime - startTime;
+  // Ensure we have at least a small positive number for execution time
+  const executionTime = Math.max(0.01, endTime - startTime);
   
   return {
     route: globalBestRoute,
