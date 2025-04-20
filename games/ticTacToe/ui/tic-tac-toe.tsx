@@ -278,7 +278,7 @@ export function TicTacToe() {
 
       <div className="flex flex-row space-x-6 items-center">
         <div className="flex flex-col items-center space-y-6 p-2">
-          <div className="flex space-x-4 items-center mt-4">
+          <div className="flex space-x-4 items-center">
             <label className="text-sm font-medium">Level:</label>
             <select
               value={strategy}
@@ -335,7 +335,7 @@ export function TicTacToe() {
 
         {/* Game Board */}
         <div className="flex flex-col items-center space-y-6 p-2">
-          <div className="grid grid-cols-5 gap-1 mt-6">
+          <div className="grid grid-cols-5 gap-1 mt-6" data-testid="game-board">
             {board.map((row, rowIndex) =>
               row.map((cell, colIndex) => (
                 <button
