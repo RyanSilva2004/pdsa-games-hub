@@ -48,6 +48,42 @@ type userGameSummary = {
 const BOARD_SIZE = 8;
 const MOVES_LIMIT = 8;
 
+export const checkAndResetScoreboard = async (
+  highestScores: any[],
+  getFilteredSolutions: (type: solutionTypes) => Promise<any>,
+  moveWinnerToOldAndReset: () => Promise<void>
+) => {
+  const allSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
+
+  const validSolutions = (allSolutions?.solution || []).map((str) =>
+    str.split(",").slice(0, -1).join(",")
+  );
+
+  const allUserSolutions = highestScores.filter((sol) => sol.status === "win");
+
+  const trimmedUserSolutions = allUserSolutions
+    .map((sol) => {
+      if (!sol.moves || !Array.isArray(sol.moves)) return null;
+      const trimmed = sol.moves.slice(0, -1);
+      return trimmed.join(",");
+    })
+    .filter(Boolean);
+
+  const matchedCount = trimmedUserSolutions.filter((userSol) =>
+    validSolutions.includes(userSol)
+  ).length;
+
+  const allMatched = matchedCount === validSolutions.length;
+
+  if (allMatched) {
+    await moveWinnerToOldAndReset();
+    console.log("Game reset. Winners moved to old collection.");
+    return true;
+  }
+
+  return false;
+};
+
 const EightQueensPuzzle = () => {
   const [playerName, setPlayerName] = useState<string>("");
   const [board, setBoard] = useState<number[][]>(
@@ -106,36 +142,6 @@ const EightQueensPuzzle = () => {
   useEffect(() => {
     // handleUser();
   }, []);
-  const handleGameScoredBordReset = async () => {
-    const allSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
-
-    const validSolutions = (allSolutions?.solution || []).map((str) =>
-      str.split(",").slice(0, -1).join(",")
-    );
-
-    const allUserSolutions = highestScores.filter(
-      (sol) => sol.status === "win"
-    );
-
-    const trimmedUserSolutions = allUserSolutions
-      .map((sol) => {
-        if (!sol.moves || !Array.isArray(sol.moves)) return null;
-        const trimmed = sol.moves.slice(0, -1);
-        return trimmed.join(",");
-      })
-      .filter(Boolean);
-
-    const matchedCount = trimmedUserSolutions.filter((userSol) =>
-      validSolutions.includes(userSol)
-    ).length;
-
-    const allMatched = matchedCount === validSolutions.length;
-
-    if (allMatched) {
-      await moveWinnerToOldAndReset();
-      console.log("Game reset. Winners moved to old collection.");
-    }
-  };
 
   const fetchScores = async () => {
     setIsScoreBoardloading(true);
@@ -159,8 +165,16 @@ const EightQueensPuzzle = () => {
     fetchScores();
   }, [isGameEndingLoading]);
 
+  const resertScoreCaller = async () => {
+    await checkAndResetScoreboard(
+      highestScores,
+      () => getFilteredSolutions(solutionTypes.SEQUENTIAL),
+      moveWinnerToOldAndReset
+    );
+  };
+
   useEffect(() => {
-    handleGameScoredBordReset();
+    resertScoreCaller();
   }, [highestScores, sequentialTime]);
 
   const formatTime = (timeInSeconds: number) => {
