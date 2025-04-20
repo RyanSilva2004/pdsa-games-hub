@@ -14,6 +14,7 @@ import {
   deleteSolution,
   getAllSolutions,
   getAllWinningMoves,
+  moveWinnerToOldAndReset,
   saveGamePlay,
   Solution,
 } from "@/app/api/eightQueensPuzzle/EightQueensPuzzleService";
@@ -105,6 +106,36 @@ const EightQueensPuzzle = () => {
   useEffect(() => {
     // handleUser();
   }, []);
+  const handleGameScoredBordReset = async () => {
+    const allSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
+
+    const validSolutions = (allSolutions?.solution || []).map((str) =>
+      str.split(",").slice(0, -1).join(",")
+    );
+
+    const allUserSolutions = highestScores.filter(
+      (sol) => sol.status === "win"
+    );
+
+    const trimmedUserSolutions = allUserSolutions
+      .map((sol) => {
+        if (!sol.moves || !Array.isArray(sol.moves)) return null;
+        const trimmed = sol.moves.slice(0, -1);
+        return trimmed.join(",");
+      })
+      .filter(Boolean);
+
+    const matchedCount = trimmedUserSolutions.filter((userSol) =>
+      validSolutions.includes(userSol)
+    ).length;
+
+    const allMatched = matchedCount === validSolutions.length;
+
+    if (allMatched) {
+      await moveWinnerToOldAndReset();
+      console.log("Game reset. Winners moved to old collection.");
+    }
+  };
 
   const fetchScores = async () => {
     setIsScoreBoardloading(true);
@@ -127,6 +158,10 @@ const EightQueensPuzzle = () => {
   useEffect(() => {
     fetchScores();
   }, [isGameEndingLoading]);
+
+  useEffect(() => {
+    handleGameScoredBordReset();
+  }, [highestScores, sequentialTime]);
 
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
@@ -461,7 +496,6 @@ const EightQueensPuzzle = () => {
           allBacktrackSolutions
         );
         setCurrentHint(hint);
-        console.log("next hint : ", hint);
       }
     }
   };
