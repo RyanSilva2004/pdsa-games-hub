@@ -29,15 +29,15 @@ export async function saveGameWithComputerTiming(data: any) {
       }
 }
 
-export async function getTopWinnersToday(level: "easy" | "hard") {
+export async function getTopWinnersToday(level: "greedy" | "minimax") {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
   
-    const levelStrategy = level === "easy" ? "greedy" : "minimax";
+    // const levelStrategy = level === "easy" ? "greedy" : "minimax";
   
     const q = query(
       collection(db, "TTT_playerWins"),
-      where("strategy", "==", levelStrategy)
+      where("strategy", "==", level)
     );
   
     const querySnapshot = await getDocs(q);

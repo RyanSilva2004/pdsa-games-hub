@@ -146,8 +146,8 @@ export function TicTacToe() {
   }, [winner]);
 
   const fetchScores = async () => {
-    const easy = await getTopWinnersToday("easy");
-    const hard = await getTopWinnersToday("hard");
+    const easy = await getTopWinnersToday(strategy);
+    const hard = await getTopWinnersToday(strategy);
     setEasyWinners(easy);
     setHardWinners(hard);
   };
