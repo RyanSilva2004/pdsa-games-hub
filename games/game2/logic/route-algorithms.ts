@@ -83,7 +83,8 @@ export function nearestNeighborAlgorithm(
   route.push(startCity);
   
   const endTime = performance.now();
-  const executionTime = endTime - startTime;
+  // Ensure we have a valid, non-negative execution time
+  const executionTime = Math.max(0.01, Math.abs(endTime - startTime));
   
   return { 
     route, 
@@ -137,7 +138,8 @@ export function bruteForceAlgorithm(
   }
   
   const endTime = performance.now();
-  const executionTime = endTime - startTime;
+  // Ensure we have at least a small positive number for execution time
+  const executionTime = Math.max(0.01, endTime - startTime);
   
   return { 
     route: bestRoute, 
