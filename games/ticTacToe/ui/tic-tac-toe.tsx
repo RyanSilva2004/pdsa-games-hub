@@ -317,7 +317,7 @@ export function TicTacToe() {
           <div className="flex flex-row space-x-6 items-center mr-8">
             <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-64 ms-5 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
               <h2 className="text-xl font-bold text-gray-200">
-                Top 5 Winners Today 🏆
+                Top 5 Winners Today  🏆
               </h2>
               <div className="grid grid-cols-1 gap-6 mt-4">
                 <div className="mb-4 w-full">
