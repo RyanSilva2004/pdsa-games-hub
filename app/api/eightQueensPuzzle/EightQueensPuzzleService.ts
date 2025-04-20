@@ -114,7 +114,6 @@ export const getAllWinningMoves = async (): Promise<ScoreEntry[]> => {
 
   querySnapshot.forEach((doc) => {
     const data = doc.data();
-    console.log("Fetched doc data:", data);
 
     if (
       Array.isArray(data.moves) &&
@@ -132,7 +131,22 @@ export const getAllWinningMoves = async (): Promise<ScoreEntry[]> => {
     }
   });
 
-  console.log("Parsed scores:", scores);
-
   return scores;
+};
+
+export const moveWinnerToOldAndReset = async () => {
+  const ref = collection(db, "8Queens_GameWinners");
+  const oldRef = collection(db, "8Queens_OldWinners");
+  const snapshot = await getDocs(ref);
+
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
+
+    await addDoc(oldRef, {
+      ...data,
+      movedAt: Timestamp.now(),
+    });
+
+    await deleteDoc(doc(ref, docSnap.id));
+  }
 };
