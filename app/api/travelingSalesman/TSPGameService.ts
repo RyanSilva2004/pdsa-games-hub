@@ -62,45 +62,6 @@ export class TSPGameService {
   }
 
   /**
-   * Save algorithm performance metrics to Firestore
-   * 
-   * @param algorithmResults Array of algorithm performance data
-   * @param gameRound The game round number
-   * @returns Promise resolving to an array of document IDs
-   */
-  async saveAlgorithmPerformance(
-    algorithmResults: TSPResult[],
-    gameRound: number,
-    optimalDistance: number
-  ): Promise<string[]> {
-    try {
-      const docIds: string[] = [];
-      
-      for (const result of algorithmResults) {
-        const performanceData: AlgorithmPerformanceRecord = {
-          algorithmName: result.algorithmName,
-          executionTime: result.executionTime,
-          distance: result.distance,
-          foundOptimal: result.distance === optimalDistance,
-          gameRound
-        };
-        
-        const docRef = await addDoc(
-          collection(firestore, "tspAlgorithmPerformance"), 
-          performanceData
-        );
-        
-        docIds.push(docRef.id);
-      }
-      
-      return docIds;
-    } catch (error) {
-      console.error("Error saving algorithm performance:", error);
-      throw error;
-    }
-  }
-
-  /**
    * Get algorithm performance data for the last 10 game rounds
    * 
    * @returns Promise resolving to algorithm performance records

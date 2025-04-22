@@ -323,7 +323,7 @@ export function runAllTspAlgorithms(
   startCity: string,
   mandatoryCities: string[]
 ): TSPResult[] {
-  // Limit brute force to cities ≤ 10 to prevent excessive computation
+
   let results: TSPResult[] = [];
   
   // Always run nearest neighbor (fast for any size)
@@ -332,19 +332,10 @@ export function runAllTspAlgorithms(
   // Run branch and bound (recursive approach)
   results.push(branchAndBoundAlgorithm(adjacencyMatrix, startCity, mandatoryCities));
   
-  // Only run brute force for smaller instances
-  if (mandatoryCities.length <= 10) {
-    results.push(bruteForceAlgorithm(adjacencyMatrix, startCity, mandatoryCities));
-  } else {
-    // For larger instances, add a note that brute force was skipped
-    results.push({
-      route: [],
-      distance: Infinity,
-      executionTime: 0,
-      algorithmName: "Brute Force (skipped due to complexity)"
-    });
-  }
-  
+  // Run bruteforce (recursive approach)
+  results.push(bruteForceAlgorithm(adjacencyMatrix, startCity, mandatoryCities));
+ 
+
   return results;
 }
 
