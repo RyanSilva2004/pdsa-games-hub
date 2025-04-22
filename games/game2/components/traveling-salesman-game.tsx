@@ -386,20 +386,6 @@ export function TravelingSalesmanGame() {
         
         await gameService.saveGameResult(gameResult);
         console.log("Game result saved successfully to Firebase!");
-        
-        // Save algorithm performance data to Firebase - make this a separate try/catch
-        try {
-          if (algorithmResults.length > 0) {
-            const perfResults = await gameService.saveAlgorithmPerformance(
-              algorithmResults,
-              nextGameRound,
-              optimal.distance
-            );
-            console.log(`Algorithm performance data saved: ${perfResults.length} records`);
-          }
-        } catch (perfError) {
-          console.error("Error saving algorithm performance:", perfError);
-        }
       } catch (error) {
         console.error("Error saving game data:", error);
       }
