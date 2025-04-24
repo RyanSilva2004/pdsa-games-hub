@@ -212,27 +212,30 @@ export function useGameLogic() {
   )
 
   // Calculate the optimal route using all algorithms
-  const calculateOptimalRoute = useCallback(() => {
-    if (!adjacencyMatrix || !gameState.homeCity) return null;
+  const calculateOptimalRoute = useCallback(
+    async (gameRound?: number) => {
+      if (!adjacencyMatrix || !gameState.homeCity) return null;
 
-    // Get the mandatory cities (selected by user)
-    const mandatoryCities = selectedCities.map(city => city.id);
-    
-    // Run all algorithms and get their results
-    const results = runAllTspAlgorithms(adjacencyMatrix, gameState.homeCity, mandatoryCities);
-    
-    // Store all algorithm results
-    setAlgorithmResults(results);
-    
-    // Get the optimal solution from all results
-    const optimal = getOptimalSolution(results);
-    
-    // Store the optimal route
-    setOptimalRoute(optimal);
-    
-    // Return the optimal solution
-    return optimal;
-  }, [adjacencyMatrix, gameState.homeCity, selectedCities]);
+      // Get the mandatory cities (selected by user)
+      const mandatoryCities = selectedCities.map(city => city.id);
+      
+      // Run all algorithms and get their results
+      const results = await runAllTspAlgorithms(adjacencyMatrix, gameState.homeCity, mandatoryCities, gameRound);
+      
+      // Store all algorithm results
+      setAlgorithmResults(results);
+      
+      // Get the optimal solution from all results
+      const optimal = getOptimalSolution(results);
+      
+      // Store the optimal route
+      setOptimalRoute(optimal);
+      
+      // Return the optimal solution
+      return optimal;
+    }, 
+    [adjacencyMatrix, gameState.homeCity, selectedCities]
+  );
 
   // Force start a new game
   const forceStartNewGame = useCallback(() => {

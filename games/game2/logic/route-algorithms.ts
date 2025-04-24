@@ -4,6 +4,10 @@
  */
 
 import { AdjacencyMatrix } from "./adjacency-matrix";
+import { TSPGameService } from "@/app/api/travelingSalesman/TSPGameService";
+
+// Initialize the game service for saving algorithm performance
+const gameService = new TSPGameService();
 
 /**
  * Interface for algorithm result including route, distance, and execution time
@@ -83,7 +87,8 @@ export function nearestNeighborAlgorithm(
   route.push(startCity);
   
   const endTime = performance.now();
-  const executionTime = endTime - startTime;
+  // Ensure we have a valid, non-negative execution time
+  const executionTime = Math.max(0.01, Math.abs(endTime - startTime));
   
   return { 
     route, 
@@ -137,7 +142,8 @@ export function bruteForceAlgorithm(
   }
   
   const endTime = performance.now();
-  const executionTime = endTime - startTime;
+  // Ensure we have at least a small positive number for execution time
+  const executionTime = Math.max(0.01, endTime - startTime);
   
   return { 
     route: bestRoute, 
@@ -223,7 +229,8 @@ export function branchAndBoundAlgorithm(
   );
   
   const endTime = performance.now();
-  const executionTime = endTime - startTime;
+  // Ensure we have at least a small positive number for execution time
+  const executionTime = Math.max(0.01, endTime - startTime);
   
   return {
     route: globalBestRoute,
@@ -315,12 +322,13 @@ function globalLowerBound(
 /**
  * Run all TSP algorithms and return all results
  */
-export function runAllTspAlgorithms(
+export async function runAllTspAlgorithms(
   adjacencyMatrix: AdjacencyMatrix,
   startCity: string,
-  mandatoryCities: string[]
-): TSPResult[] {
-  // Limit brute force to cities ≤ 10 to prevent excessive computation
+  mandatoryCities: string[],
+  gameRound?: number
+): Promise<TSPResult[]> {
+
   let results: TSPResult[] = [];
   
   // Always run nearest neighbor (fast for any size)
@@ -329,19 +337,19 @@ export function runAllTspAlgorithms(
   // Run branch and bound (recursive approach)
   results.push(branchAndBoundAlgorithm(adjacencyMatrix, startCity, mandatoryCities));
   
-  // Only run brute force for smaller instances
-  if (mandatoryCities.length <= 10) {
-    results.push(bruteForceAlgorithm(adjacencyMatrix, startCity, mandatoryCities));
-  } else {
-    // For larger instances, add a note that brute force was skipped
-    results.push({
-      route: [],
-      distance: Infinity,
-      executionTime: 0,
-      algorithmName: "Brute Force (skipped due to complexity)"
-    });
+  // Run bruteforce (recursive approach)
+  results.push(bruteForceAlgorithm(adjacencyMatrix, startCity, mandatoryCities));
+ 
+  // Save algorithm performance data to database if gameRound is provided
+  if (gameRound !== undefined) {
+    try {
+      await gameService.saveAlgorithmPerformance(results, gameRound);
+      console.log("Algorithm performance saved successfully to Firestore!");
+    } catch (error) {
+      console.error("Error saving algorithm performance:", error);
+    }
   }
-  
+
   return results;
 }
 
