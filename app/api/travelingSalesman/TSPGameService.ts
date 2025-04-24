@@ -24,6 +24,19 @@ export interface AlgorithmPerformanceRecord {
 }
 
 /**
+ * Interface for grouped algorithm performance data
+ */
+export interface GroupedAlgorithmPerformance {
+  algorithms: {
+    name: string;
+    executionTime: number;
+    distance: number;
+  }[];
+  gameRound: number;
+  timestamp: any;
+}
+
+/**
  * Interface for TSP game data to be stored in Firebase
  */
 export interface TSPGameRecord {
@@ -57,6 +70,42 @@ export class TSPGameService {
       return docRef.id;
     } catch (error) {
       console.error("Error saving game result:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save algorithm performance results to Firestore
+   * 
+   * @param results Array of algorithm results
+   * @param gameRound The game round number
+   * @returns Promise resolving to the document ID
+   */
+  async saveAlgorithmPerformance(
+    results: TSPResult[],
+    gameRound: number
+  ): Promise<string> {
+    try {
+      // Format the data for Firestore
+      const algorithmData: GroupedAlgorithmPerformance = {
+        algorithms: results.map(result => ({
+          name: result.algorithmName,
+          executionTime: result.executionTime,
+          distance: result.distance
+        })),
+        gameRound,
+        timestamp: serverTimestamp()
+      };
+
+      // Save to Firestore
+      const docRef = await addDoc(
+        collection(firestore, "tspAlgorithmPerformance"), 
+        algorithmData
+      );
+      
+      return docRef.id;
+    } catch (error) {
+      console.error("Error saving algorithm performance:", error);
       throw error;
     }
   }
