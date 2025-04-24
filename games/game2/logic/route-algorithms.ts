@@ -4,6 +4,10 @@
  */
 
 import { AdjacencyMatrix } from "./adjacency-matrix";
+import { TSPGameService } from "@/app/api/travelingSalesman/TSPGameService";
+
+// Initialize the game service for saving algorithm performance
+const gameService = new TSPGameService();
 
 /**
  * Interface for algorithm result including route, distance, and execution time
@@ -318,11 +322,12 @@ function globalLowerBound(
 /**
  * Run all TSP algorithms and return all results
  */
-export function runAllTspAlgorithms(
+export async function runAllTspAlgorithms(
   adjacencyMatrix: AdjacencyMatrix,
   startCity: string,
-  mandatoryCities: string[]
-): TSPResult[] {
+  mandatoryCities: string[],
+  gameRound?: number
+): Promise<TSPResult[]> {
 
   let results: TSPResult[] = [];
   
@@ -335,6 +340,15 @@ export function runAllTspAlgorithms(
   // Run bruteforce (recursive approach)
   results.push(bruteForceAlgorithm(adjacencyMatrix, startCity, mandatoryCities));
  
+  // Save algorithm performance data to database if gameRound is provided
+  if (gameRound !== undefined) {
+    try {
+      await gameService.saveAlgorithmPerformance(results, gameRound);
+      console.log("Algorithm performance saved successfully to Firestore!");
+    } catch (error) {
+      console.error("Error saving algorithm performance:", error);
+    }
+  }
 
   return results;
 }

@@ -342,35 +342,36 @@ export function TravelingSalesmanGame() {
     setUserSolution(route);
     setSolutionDistance(distance);
     
-    // Calculate the optimal route for comparison
-    const optimal = calculateOptimalRoute();
-    
-    if (optimal) {
-      // Determine if user found the optimal solution
-      const isOptimal = distance === optimal.distance;
+    try {
+      // Get the next game round number
+      const nextGameRound = await gameService.getLatestGameRound() + 1;
       
-      // Calculate how close they were as a percentage
-      const percentageFromOptimal = ((distance - optimal.distance) / optimal.distance * 100).toFixed(1);
+      // Calculate the optimal route for comparison
+      // Pass the gameRound parameter to save algorithm performance data
+      const optimal = await calculateOptimalRoute(nextGameRound);
       
-      // Set appropriate message based on result
-      if (isOptimal) {
-        setMessage({
-          type: "success",
-          text: `Congratulations! You found the optimal route with a total distance of ${distance} km!`,
-        });
-      } else {
-        setMessage({
-          type: "info",
-          text: `Your route has a total distance of ${distance} km. The optimal route is ${optimal.distance} km (${percentageFromOptimal}% difference).`,
-        });
+      if (optimal) {
+        // Determine if user found the optimal solution
+        const isOptimal = distance === optimal.distance;
         
-        // Show the optimal route immediately if the user's solution is wrong
-        setShowOptimalRoute(true);
-      }
-      
-      try {
-        // Get the next game round number
-        const nextGameRound = await gameService.getLatestGameRound() + 1;
+        // Calculate how close they were as a percentage
+        const percentageFromOptimal = ((distance - optimal.distance) / optimal.distance * 100).toFixed(1);
+        
+        // Set appropriate message based on result
+        if (isOptimal) {
+          setMessage({
+            type: "success",
+            text: `Congratulations! You found the optimal route with a total distance of ${distance} km!`,
+          });
+        } else {
+          setMessage({
+            type: "info",
+            text: `Your route has a total distance of ${distance} km. The optimal route is ${optimal.distance} km (${percentageFromOptimal}% difference).`,
+          });
+          
+          // Show the optimal route immediately if the user's solution is wrong
+          setShowOptimalRoute(true);
+        }
         
         // Save game result to Firebase
         const gameResult = {
@@ -386,14 +387,14 @@ export function TravelingSalesmanGame() {
         
         await gameService.saveGameResult(gameResult);
         console.log("Game result saved successfully to Firebase!");
-      } catch (error) {
-        console.error("Error saving game data:", error);
+      } else {
+        setMessage({
+          type: "info",
+          text: `Your route has a total distance of ${distance} km.`,
+        });
       }
-    } else {
-      setMessage({
-        type: "info",
-        text: `Your route has a total distance of ${distance} km.`,
-      });
+    } catch (error) {
+      console.error("Error saving game data:", error);
     }
     
     // Move to completed phase using the correct function from useGameLogic
