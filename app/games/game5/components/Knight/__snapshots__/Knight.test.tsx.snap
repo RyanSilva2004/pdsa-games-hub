@@ -1,0 +1,16 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Knight Component matches snapshot 1`] = `
+<DocumentFragment>
+  <div
+    class="absolute w-[50px] h-[50px] flex items-center justify-center"
+    style="transform: translate(150px, 100px);"
+  >
+    <span
+      class="text-4xl mr-2 text-black leading-none"
+    >
+      ♞
+    </span>
+  </div>
+</DocumentFragment>
+`;

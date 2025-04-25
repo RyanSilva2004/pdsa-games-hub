@@ -1,5 +1,5 @@
 import { addDoc, collection } from "firebase/firestore";
-import  {firestore} from "../../../../lib/firebase";
+import  {firestore} from "../../../../../lib/firebase";
 
 interface GameResult {
   playerName: string;
@@ -45,7 +45,7 @@ const saveGameResult = async (gameResult: GameResult) => {
   }
 
   try {
-    const docRef = await addDoc(collection(firestore, "gameResults"), {
+    const docRef = await addDoc(collection(firestore, "KnightsTour"), {
       ...gameResult,
       timestamp: new Date(),
     });

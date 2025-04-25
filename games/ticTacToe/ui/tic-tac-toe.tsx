@@ -15,6 +15,11 @@ import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
 import DrawImage from "@/public/draw.gif";
 import Image from "next/image";
+import {
+  savePlayerWinResult,
+  saveGameWithComputerTiming,
+  getTopWinnersToday,
+} from "../utils/dbLogger";
 
 export function TicTacToe() {
   const [board, setBoard] = useState(emptyBoard());
@@ -33,6 +38,10 @@ export function TicTacToe() {
   const [playerWins, setPlayerWins] = useState(0);
   const [computerWins, setComputerWins] = useState(0);
   const [draws, setDraws] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
+  const [easyWinners, setEasyWinners] = useState<{ name: string; wins: number }[]>([]);
+  const [hardWinners, setHardWinners] = useState<{ name: string; wins: number }[]>([]);
+  const [isLoadingWinners, setIsLoadingWinners] = useState(false);
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || winner || !isHumanTurn) return;
@@ -75,7 +84,7 @@ export function TicTacToe() {
       );
       if (resultData) {
         console.log("Player winning result:", resultData);
-        // send this to backend
+        savePlayerWinResult(resultData);
       }
     } else if (newBoard.flat().every((cell) => cell !== null)) {
       setWinner("Draw");
@@ -132,9 +141,26 @@ export function TicTacToe() {
       );
 
       console.log("Computer game result:", result);
-      // send this to backend
+      saveGameWithComputerTiming(result);
+      fetchScores();
     }
   }, [winner]);
+
+  const fetchScores = async () => {
+    setIsLoadingWinners(true);
+    try {
+      const easy = await getTopWinnersToday(strategy);
+      const hard = await getTopWinnersToday(strategy);
+      setEasyWinners(easy);
+      setHardWinners(hard);
+    } finally {
+      setIsLoadingWinners(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScores();
+  }, [strategy]);
 
   if (!playerNameSubmitted) {
     return (
@@ -145,31 +171,13 @@ export function TicTacToe() {
         <input
           type="text"
           placeholder="Your name"
-          className="border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-60"
+          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
           value={playerName}
           onChange={(e) => setPlayerName(e.target.value)}
         />
-        <div className="flex space-x-4 items-center">
-          <label className="text-sm font-medium">Level:</label>
-          <select
-            value={strategy}
-            onChange={(e) =>
-              setStrategy(e.target.value as "minimax" | "greedy")
-            }
-            className="border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="greedy">Easy</option>
-            <option value="minimax">Hard</option>
-          </select>
-        </div>
         <button
-          className="px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-300"
-          onClick={() => {
-            if (playerName.trim()) {
-              setPlayerNameSubmitted(true);
-              setStartTime(new Date());
-            }
-          }}
+          className="text-white bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
+          onClick={() => setPlayerNameSubmitted(true)}
         >
           Start Game
         </button>
@@ -236,11 +244,123 @@ export function TicTacToe() {
       <h2 className="text-xl font-medium text-center">
         Hello, {playerName}! It's {isHumanTurn ? "your" : "computer"} turn
       </h2>
+      {showHelp && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-80 text-center shadow-lg relative">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              How to Play
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              <b>Welcome to 5x5 Tic Tac Toe!</b>
+              <br />
+              <br />
+              Try to get five of your <b>'X'</b>s in a row:{" "}
+              <i>vertically, horizontally, or diagonally</i>, before the
+              computer lines up five <b>'O'</b>s.
+              <br />
+              <br />
+              You’re always <b>'X'</b> and go first.
+              <br />
+              You can undo only your last move.
+              <br />
+              <br />
+              Good luck and have fun!
+            </p>
+            <button
+              onClick={() => setShowHelp(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-black"
+            >
+              ✖
+            </button>
+            <button
+              onClick={() => setShowHelp(false)}
+              className="text-white bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-row space-x-6 items-center">
+        <div className="flex flex-col items-center space-y-6 p-2">
+          <div className="flex items-center space-x-4">
+            <span
+              className={`text-sm font-medium ${
+                strategy === "greedy" ? "text-green-500" : "text-gray-400"
+              }`}
+            >
+              Easy
+            </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={strategy === "minimax"}
+                onChange={(e) => {
+                  const newStrategy = e.target.checked ? "minimax" : "greedy";
+                  setStrategy(newStrategy);
+                  resetGame();
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+            <span
+              className={`text-sm font-medium ${
+                strategy === "minimax" ? "text-red-500" : "text-gray-400"
+              }`}
+            >
+              Hard
+            </span>
+          </div>
+
+          <div className="flex flex-row space-x-6 items-center mr-8">
+            <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-64 ms-5 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
+              <h2 className="text-xl font-bold text-gray-200">
+                Top 5 Winners Today  🏆
+              </h2>
+              <div className="grid grid-cols-1 gap-6 mt-4">
+                <div className="mb-4 w-full">
+                  <div className="flex flex-col">
+                    {isLoadingWinners ? (
+                      <div className="flex justify-center items-center h-20">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
+                      </div>
+                    ) : strategy === "greedy" && easyWinners.length > 0 ? (
+                      easyWinners.slice(0, 5).map((winner, index) => (
+                        <span
+                          key={index}
+                          className="text-sm font-semibold text-gray-500 mb-2"
+                        >
+                          {index + 1}. {winner.name} - {winner.wins} win
+                          {winner.wins > 1 ? "s" : ""}
+                        </span>
+                      ))
+                    ) : hardWinners.length > 0 ? (
+                      hardWinners.slice(0, 5).map((winner, index) => (
+                        <span
+                          key={index}
+                          className="text-sm font-semibold text-gray-500 mb-2"
+                        >
+                          {index + 1}. {winner.name} - {winner.wins} win
+                          {winner.wins > 1 ? "s" : ""}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm font-semibold text-gray-500">
+                        No winners yet
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Game Board */}
         <div className="flex flex-col items-center space-y-6 p-2">
-          <div className="grid grid-cols-5 gap-1 mt-6">
+          <div className="grid grid-cols-5 gap-1 mt-6" data-testid="game-board">
             {board.map((row, rowIndex) =>
               row.map((cell, colIndex) => (
                 <button
@@ -258,18 +378,18 @@ export function TicTacToe() {
           <div className="flex space-x-6 mt-6">
             <button
               onClick={resetGame}
-              className="px-6 py-3 bg-green-500 text-white rounded hover:bg-green-600 transition duration-300"
+              className="text-white bg-gradient-to-r from-teal-400 via-teal-500 to-teal-600 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-teal-300 dark:focus:ring-teal-800 shadow-lg shadow-teal-500/50 dark:shadow-lg dark:shadow-teal-800/80 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
             >
               Restart Game
             </button>
-
+{/*  font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2    */}
             <button
               onClick={handleUndo}
               disabled={!canUndo || history.length < 2 || winner !== null}
-              className={`px-6 py-3 rounded text-white ${
+              className={`font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2 ${
                 !canUndo || history.length < 2 || winner
                   ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-yellow-500 hover:bg-yellow-600"
+                  : "text-gray-600 bg-gradient-to-r from-lime-200 via-lime-400 to-lime-500 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-lime-300 dark:focus:ring-lime-800 shadow-lg shadow-lime-500/50 dark:shadow-lg dark:shadow-lime-800/80"
               } transition duration-300`}
             >
               Undo Last Move
@@ -277,52 +397,64 @@ export function TicTacToe() {
           </div>
         </div>
 
-        {/* Scoreboard */}
-        <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 h-fit ms-5">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-gray-2000">
-              Game Scoreboard
-            </h2>
-          </div>
+        <div className="flex flex-col items-center space-y-6 p-2">
+          {/* Scoreboard */}
+          <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-64 ms-5 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
+            <div className="text-center mb-4">
+              <h2 className="text-xl font-bold text-gray-2000">
+                Game Scoreboard
+              </h2>
+            </div>
 
-          <div className="mb-4 w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-400">Level</span>
-              <span className="font-semibold text-gray-300">{strategy === "greedy" ? "Easy" : "Hard"}</span>
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-400">Level</span>
+                <span className="font-semibold text-gray-300">
+                  {strategy === "greedy" ? "Easy" : "Hard"}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-400">Player</span>
+                <span className="font-semibold text-gray-300">
+                  {playerName}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Player Wins</span>
+                <span className="font-semibold text-green-400">
+                  {playerWins}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-4 w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Computer Wins</span>
+                <span className="font-semibold text-blue-400">
+                  {computerWins}
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Draws</span>
+                <span className="font-semibold text-yellow-400">{draws}</span>
+              </div>
             </div>
           </div>
-
-          <div className="mb-4 w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-400">Player</span>
-              <span className="font-semibold text-gray-300">{playerName}</span>
-            </div>
-          </div>
-
-          <div className="mb-4 w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Player Wins</span>
-              <span className="font-semibold text-green-400">{playerWins}</span>
-            </div>
-          </div>
-
-          <div className="mb-4 w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Computer Wins</span>
-              <span className="font-semibold text-blue-400">
-                {computerWins}
-              </span>
-            </div>
-          </div>
-
-          <div className="w-full">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Draws</span>
-              <span className="font-semibold text-yellow-400">{draws}</span>
-            </div>
-          </div>
-
-          
+          <button
+            className="text-white bg-gradient-to-r from-cyan-400 via-cyan-500 to-cyan-600 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-cyan-300 dark:focus:ring-cyan-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
+            onClick={() => setShowHelp(true)}
+          >
+            Help
+          </button>
         </div>
       </div>
     </div>
