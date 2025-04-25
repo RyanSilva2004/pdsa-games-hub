@@ -2,9 +2,17 @@ export const solveKnightsTourBacktracking = async (
   startRow: number,
   startCol: number,
   boardSize: number = 8,
-  maxIterations: number = 500000, // Reduced for faster timeout
-  timeoutMs: number = 1000 // Stricter 1-second timeout
+  maxIterations: number = 500000,
+  timeoutMs: number = 1000
 ): Promise<number[][] | null> => {
+  // Validate inputs first
+  if (
+    startRow < 0 || startRow >= boardSize ||
+    startCol < 0 || startCol >= boardSize
+  ) {
+    return null;
+  }
+
   const board = Array(boardSize)
     .fill(null)
     .map(() => Array(boardSize).fill(-1));
@@ -35,7 +43,10 @@ export const solveKnightsTourBacktracking = async (
       return false;
     }
 
-    for (const [dr, dc] of moves) {
+    // Try all possible moves in random order for better performance
+    const shuffledMoves = [...moves].sort(() => Math.random() - 0.5);
+    
+    for (const [dr, dc] of shuffledMoves) {
       const nextRow = row + dr;
       const nextCol = col + dc;
 
@@ -48,20 +59,22 @@ export const solveKnightsTourBacktracking = async (
       ) {
         board[nextRow][nextCol] = moveCount;
         iterations++;
+        
+        // Yield to event loop periodically
         if (iterations % 2000 === 0) {
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
+        
         if (await backtrack(nextRow, nextCol, moveCount + 1)) {
           return true;
         }
+        
+        // Backtrack
         board[nextRow][nextCol] = -1;
       }
     }
     return false;
   };
 
-  if (await backtrack(startRow, startCol, 1)) {
-    return board;
-  }
-  return null;
+  return (await backtrack(startRow, startCol, 1)) ? board : null;
 };

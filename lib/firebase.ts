@@ -1,5 +1,6 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -9,7 +10,14 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const firestore = getFirestore(app);
+let app;
+let firestore;
 
-export { app, firestore };
+try {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  firestore = getFirestore(app);
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+}
+
+export { firestore };
