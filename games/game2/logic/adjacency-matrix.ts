@@ -1,9 +1,5 @@
-/**
- * AdjacencyMatrix class for the Traveling Salesman Problem
- * This class manages the distances between cities and provides
- * methods to access and manipulate the matrix.
- */
-export class AdjacencyMatrix {
+export class AdjacencyMatrix 
+{
     private matrix: Record<string, Record<string, number>> = {}
     private cityIds: string[] = []
   
@@ -12,6 +8,7 @@ export class AdjacencyMatrix {
      * @param cityIds Array of city IDs (e.g., ["A", "B", "C"])
      * @param randomize Whether to generate random distances (default: true)
      */
+    
     constructor(cityIds: string[], randomize = true) {
       this.cityIds = [...cityIds]
       this.initialize(randomize)
