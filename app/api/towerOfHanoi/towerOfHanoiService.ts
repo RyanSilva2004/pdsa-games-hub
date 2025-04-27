@@ -5,6 +5,7 @@ export type GameRecord = {
   playerName: string;
   moves: number;
   timeTaken: number;
+  moveSequence: string[];
   createdAt: Timestamp;
 };
 
@@ -17,10 +18,6 @@ export const saveGameRecord = async (record: Omit<GameRecord, 'createdAt'>) => {
     }
 
     const ref = collection(firestore, "towerOfHanoi_records");
-
-    // Debugging the ref object
-    console.log("Firestore reference:", ref);
-
     const docRef = await addDoc(ref, {
       ...record,
       createdAt: Timestamp.now(),
