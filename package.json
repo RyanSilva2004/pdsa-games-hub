@@ -1,12 +1,14 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
+  "name": "pdsa_games_hub",
+  "version": "dev_0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -38,12 +40,14 @@
     "@radix-ui/react-toggle-group": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
     "autoprefixer": "^10.4.20",
+    "axios": "^1.8.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "3.0.0",
     "embla-carousel-react": "8.5.1",
     "firebase": "^11.6.0",
+    "framer-motion": "^12.7.3",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
@@ -52,6 +56,8 @@
     "react-day-picker": "8.10.1",
     "react-dom": "^19",
     "react-hook-form": "^7.54.1",
+    "react-hot-toast": "^2.5.2",
+    "react-icons": "^5.5.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
     "sonner": "^1.7.1",
@@ -61,11 +67,24 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@babel/plugin-transform-runtime": "^7.26.10",
+    "@babel/preset-env": "^7.26.9",
+    "@babel/preset-react": "^7.26.3",
+    "@babel/preset-typescript": "^7.27.0",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/jest": "^29.5.14",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
+    "ts-jest": "^29.3.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

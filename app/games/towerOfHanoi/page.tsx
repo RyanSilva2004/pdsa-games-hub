@@ -5,6 +5,7 @@ import { PageHeader } from "@/shared/components/page-header";
 import Image from "next/image";
 import WinImage from "@/public/icons/win.png";
 import LostImage from "@/public/icons/lost.png";
+import axios from "axios";
 
 type Props = {};
 
@@ -63,6 +64,33 @@ export default class TowerOfHanoi extends Component<Props, State> {
   componentWillUnmount() {
     if (this.timerInterval) clearInterval(this.timerInterval);
   }
+
+  saveGameToDB = async (playerName: string, moves: number, timeTaken: number) => {
+    try {
+      console.log("Saving game results:", { playerName, moves, timeTaken });
+      
+      const response = await axios.post(
+        "/api/towerOfHanoi",
+        {
+          playerName,
+          moves,
+          timeTaken,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      console.log("Save response:", response.data);
+      return response.data;
+  
+    } catch (error) {
+      console.error("Error saving game:", error);
+      throw error;
+    }
+  };
 
   getDiskColor = (diskSize: number) => {
     const colors = [
@@ -195,15 +223,28 @@ export default class TowerOfHanoi extends Component<Props, State> {
 
   checkWinCondition = () => {
     if (this.state.pegs[2].length === NUM_DISKS) {
-      this.setState({
-        isModalOpen: true,
-        gameMessage: "You won!",
-        isGameStarted: false,
-      });
+      const timeTaken = this.state.elapsedTime;
+      this.saveGameToDB(this.state.playerName, this.state.moveCount, timeTaken)
+        .then(() => {
+          this.setState({
+            isModalOpen: true,
+            gameMessage: "You won!",
+            isGameStarted: false,
+          });
+        })
+        .catch((error) => {
+          console.error("Failed to save game:", error);
+          // Still show win message even if save fails
+          this.setState({
+            isModalOpen: true,
+            gameMessage: "You won! (Score not saved)",
+            isGameStarted: false,
+          });
+        });
+  
       if (this.timerInterval) clearInterval(this.timerInterval);
     }
   };
-
   render() {
     return (
       <main className="container mx-auto px-4 py-8">
@@ -234,7 +275,6 @@ export default class TowerOfHanoi extends Component<Props, State> {
         </div>
 
         <div className="flex justify-center">
-          {/* Pegs display */}
           <div className="flex space-x-8">
             {["A", "B", "C"].map((peg, pegIndex) => (
               <div key={peg} className="flex flex-col items-center">
@@ -242,12 +282,9 @@ export default class TowerOfHanoi extends Component<Props, State> {
                   className="w-64 h-96 relative"
                   onClick={() => this.handlePegClick(pegIndex)}
                 >
-                  {/* Peg stand */}
                   <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-4 h-64 bg-amber-700 rounded"></div>
-                  {/* Peg base */}
                   <div className="absolute bottom-0 left-0 w-full h-4 bg-amber-800 rounded"></div>
                   
-                  {/* Disks */}
                   {this.state.pegs[pegIndex].map((disk, diskIndex) => (
                     <div
                       key={diskIndex}
@@ -272,7 +309,6 @@ export default class TowerOfHanoi extends Component<Props, State> {
             ))}
           </div>
 
-          {/* Game score and action buttons */}
           <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
             <h2 className="text-xl font-bold text-gray-800">Moves</h2>
             <span className="text-lg font-semibold">{this.state.moveCount}</span>

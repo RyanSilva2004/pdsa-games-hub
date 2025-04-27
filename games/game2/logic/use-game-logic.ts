@@ -4,6 +4,11 @@ import { useState, useCallback } from "react"
 import type { City, GameState } from "./types"
 import { GamePhase } from "./types"
 import { AdjacencyMatrix } from "./adjacency-matrix"
+import { 
+  runAllTspAlgorithms, 
+  getOptimalSolution,
+  TSPResult 
+} from "./route-algorithms"
 
 // Define all possible cities
 const allCities: City[] = [
@@ -22,6 +27,7 @@ const allCities: City[] = [
 const initialGameState: GameState = {
   currentRoute: [],
   startCity: null,
+  homeCity: null,  // Add the homeCity property to initial state
   totalDistance: 0,
   isComplete: false,
 }
@@ -39,7 +45,10 @@ export function useGameLogic() {
 
   // Game state
   const [gameState, setGameState] = useState<GameState>(initialGameState)
-  const [optimalRoute, setOptimalRoute] = useState<{ route: string[]; distance: number } | null>(null)
+  
+  // Algorithm results
+  const [algorithmResults, setAlgorithmResults] = useState<TSPResult[]>([])
+  const [optimalRoute, setOptimalRoute] = useState<TSPResult | null>(null)
 
   // Map visualization state
   const [isMapReady, setIsMapReady] = useState(false)
@@ -51,6 +60,7 @@ export function useGameLogic() {
   const resetGame = useCallback(() => {
     setGameState(initialGameState)
     setOptimalRoute(null)
+    setAlgorithmResults([])
   }, [])
 
   // Initialize available cities based on count and create the map
@@ -86,10 +96,29 @@ export function useGameLogic() {
     [gamePhase, forceNewGame, resetGame],
   )
 
+  // Select a random home city after map visualization
+  const selectRandomHomeCity = useCallback(() => {
+    if (availableCities.length === 0) return null;
+    
+    // Select a random city from available cities
+    const randomIndex = Math.floor(Math.random() * availableCities.length);
+    const homeCity = availableCities[randomIndex].id;
+    
+    // Update game state with the selected home city
+    setGameState(prevState => ({
+      ...prevState,
+      homeCity
+    }));
+    
+    return homeCity;
+  }, [availableCities]);
+
   // Called when the map visualization is complete
   const onMapVisualizationComplete = useCallback(() => {
-    setIsMapReady(true)
-  }, [])
+    setIsMapReady(true);
+    // Randomly select a home city when the map is ready
+    selectRandomHomeCity();
+  }, [selectRandomHomeCity]);
 
   // Move to city selection phase after map is visualized
   const startCitySelection = useCallback(() => {
@@ -101,13 +130,16 @@ export function useGameLogic() {
   // Toggle city selection
   const toggleCitySelection = useCallback(
     (cityId: string) => {
-      if (gamePhase !== GamePhase.CITY_SELECTION) return
+      if (gamePhase !== GamePhase.CITY_SELECTION) return;
+      
+      // Check if the city is the home city, if so don't allow selection
+      if (cityId === gameState.homeCity) return;
 
       setAvailableCities((prev) =>
         prev.map((city) => (city.id === cityId ? { ...city, selected: !city.selected } : city)),
       )
     },
-    [gamePhase],
+    [gamePhase, gameState.homeCity],
   )
 
   // Confirm city selection
@@ -119,16 +151,11 @@ export function useGameLogic() {
       return false
     }
 
+    // Keep the same cities in availableCities, but mark the mandatory visit cities
     setSelectedCities(selected)
 
-    // Create a new adjacency matrix with only the selected cities
-    const cityIds = selected.map((city) => city.id)
-    const matrix = new AdjacencyMatrix(cityIds)
-    setAdjacencyMatrix(matrix)
-
-    // For now, we just save the selection
-    // In the future, we would move to route planning phase
-    // setGamePhase(GamePhase.ROUTE_PLANNING)
+    // Move to route planning phase with all cities still available
+    setGamePhase(GamePhase.ROUTE_PLANNING)
 
     return true
   }, [availableCities])
@@ -184,47 +211,31 @@ export function useGameLogic() {
     [gamePhase, adjacencyMatrix, gameState, selectedCities],
   )
 
-  // Calculate the optimal route (for future use)
-  const calculateOptimalRoute = useCallback(() => {
-    if (!adjacencyMatrix || !gameState.startCity) return null
+  // Calculate the optimal route using all algorithms
+  const calculateOptimalRoute = useCallback(
+    async (gameRound?: number) => {
+      if (!adjacencyMatrix || !gameState.homeCity) return null;
 
-    const cityIds = adjacencyMatrix.getCityIds()
-
-    // Use nearest neighbor algorithm for simplicity
-    const startCity = gameState.startCity
-    const unvisited = cityIds.filter((id) => id !== startCity)
-    const route = [startCity]
-    let currentCity = startCity
-    let totalDistance = 0
-
-    while (unvisited.length > 0) {
-      // Find the nearest unvisited city
-      let nearestCity = unvisited[0]
-      let minDistance = adjacencyMatrix.getDistance(currentCity, nearestCity)
-
-      for (let i = 1; i < unvisited.length; i++) {
-        const city = unvisited[i]
-        const distance = adjacencyMatrix.getDistance(currentCity, city)
-        if (distance < minDistance) {
-          nearestCity = city
-          minDistance = distance
-        }
-      }
-
-      // Add the nearest city to the route
-      route.push(nearestCity)
-      totalDistance += minDistance
-      currentCity = nearestCity
-      unvisited.splice(unvisited.indexOf(nearestCity), 1)
-    }
-
-    // Add the return to start
-    totalDistance += adjacencyMatrix.getDistance(currentCity, startCity)
-    route.push(startCity)
-
-    setOptimalRoute({ route, distance: totalDistance })
-    return { route, distance: totalDistance }
-  }, [adjacencyMatrix, gameState.startCity])
+      // Get the mandatory cities (selected by user)
+      const mandatoryCities = selectedCities.map(city => city.id);
+      
+      // Run all algorithms and get their results
+      const results = await runAllTspAlgorithms(adjacencyMatrix, gameState.homeCity, mandatoryCities, gameRound);
+      
+      // Store all algorithm results
+      setAlgorithmResults(results);
+      
+      // Get the optimal solution from all results
+      const optimal = getOptimalSolution(results);
+      
+      // Store the optimal route
+      setOptimalRoute(optimal);
+      
+      // Return the optimal solution
+      return optimal;
+    }, 
+    [adjacencyMatrix, gameState.homeCity, selectedCities]
+  );
 
   // Force start a new game
   const forceStartNewGame = useCallback(() => {
@@ -238,6 +249,7 @@ export function useGameLogic() {
     adjacencyMatrix,
     gameState,
     optimalRoute,
+    algorithmResults, // New: expose algorithm results
     isMapReady,
     initializeGame,
     onMapVisualizationComplete,
@@ -248,5 +260,6 @@ export function useGameLogic() {
     resetGame,
     calculateOptimalRoute,
     forceStartNewGame,
+    setGamePhase,
   }
 }

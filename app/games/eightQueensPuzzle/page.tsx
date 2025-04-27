@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Component, useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { PageHeader } from "@/shared/components/page-header";
 import QueenIcon from "@/public/icons/queen.icon";
 import Image from "next/image";
@@ -9,6 +9,28 @@ import LostImage from "@/public/over.gif";
 import findAllNQueensSolutions from "./utils/eightQueensSolver";
 import { CommonContext } from "@/context/Common";
 import { createUser, createGuestUser } from "../../api/user";
+import {
+  addGeneratedSolution,
+  deleteSolution,
+  getAllSolutions,
+  getAllWinningMoves,
+  moveWinnerToOldAndReset,
+  saveGamePlay,
+  Solution,
+} from "@/app/api/eightQueensPuzzle/EightQueensPuzzleService";
+import {
+  gameStatusType,
+  SolutionRecognition,
+  solutionTypes,
+} from "@/app/types/gameEnums";
+import { userType } from "@/app/types/userEnums";
+import getHintFromSolutions from "./utils/hintFromSolutions";
+import { headers } from "next/headers";
+
+type errorType = {
+  header: string;
+  description: string | unknown;
+};
 
 type ScoreEntry = {
   name: string;
@@ -25,6 +47,42 @@ type userGameSummary = {
 
 const BOARD_SIZE = 8;
 const MOVES_LIMIT = 8;
+
+export const checkAndResetScoreboard = async (
+  highestScores: any[],
+  getFilteredSolutions: (type: solutionTypes) => Promise<any>,
+  moveWinnerToOldAndReset: () => Promise<void>
+) => {
+  const allSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
+
+  const validSolutions = (allSolutions?.solution || []).map((str) =>
+    str.split(",").slice(0, -1).join(",")
+  );
+
+  const allUserSolutions = highestScores.filter((sol) => sol.status === "win");
+
+  const trimmedUserSolutions = allUserSolutions
+    .map((sol) => {
+      if (!sol.moves || !Array.isArray(sol.moves)) return null;
+      const trimmed = sol.moves.slice(0, -1);
+      return trimmed.join(",");
+    })
+    .filter(Boolean);
+
+  const matchedCount = trimmedUserSolutions.filter((userSol) =>
+    validSolutions.includes(userSol)
+  ).length;
+
+  const allMatched = matchedCount === validSolutions.length;
+
+  if (allMatched) {
+    await moveWinnerToOldAndReset();
+    console.log("Game reset. Winners moved to old collection.");
+    return true;
+  }
+
+  return false;
+};
 
 const EightQueensPuzzle = () => {
   const [playerName, setPlayerName] = useState<string>("");
@@ -44,23 +102,25 @@ const EightQueensPuzzle = () => {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  const [highestScores, setHighestScores] = useState([]);
+  const [highestScores, setHighestScores] = useState<ScoreEntry[]>([]);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
-  const [solution, setSolution] = useState<string>("");
+  const [error, setError] = useState<errorType | null>();
 
-  useEffect(() => {
-    const worker = new Worker(new URL("./utils/workerThread", import.meta.url));
+  const [sequentialTime, setSequentialTime] = useState<number | null>(null);
+  const [threadedTime, setThreadedTime] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isScoreBoardLoading, setIsScoreBoardloading] = useState(false);
+  const [isGameEndingLoading, setIsGameEndingLoading] = useState(false);
+  const [allBacktrackSolutions, setAllBacktrackSolutions] = useState<
+    string[] | undefined
+  >([]);
 
-    worker.onmessage = (e) => {
-      setSolution(e.data);
-    };
-
-    worker.postMessage(board);
-
-    return () => {
-      worker.terminate();
-    };
-  }, [board]);
+  const [currentHint, setCurrentHint] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+  const [hintCount, setHintCount] = useState(2);
+  const [hintVislbe, setHintVislbe] = useState(true);
 
   const handleUser = async () => {
     try {
@@ -73,9 +133,7 @@ const EightQueensPuzzle = () => {
       // } else {
       //   throw new Error('Invalid userType provided.');
       // }
-    } catch (e) {
-      console.log("error : ", e);
-    }
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -83,8 +141,42 @@ const EightQueensPuzzle = () => {
   }, []);
 
   useEffect(() => {
-    handleUser();
+    // handleUser();
   }, []);
+
+  const fetchScores = async () => {
+    setIsScoreBoardloading(true);
+    try {
+      const allScores = await getAllWinningMoves();
+
+      const sortedTopWinners = allScores
+        .filter((score) => score.status === "win")
+        .sort((a, b) => a.time - b.time)
+        .slice(0, 10);
+
+      setHighestScores(sortedTopWinners);
+    } catch (e) {
+      setError({ header: "Error in Fetching Score Board", description: e });
+    } finally {
+      setIsScoreBoardloading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScores();
+  }, [isGameEndingLoading]);
+
+  const resertScoreCaller = async () => {
+    await checkAndResetScoreboard(
+      highestScores,
+      () => getFilteredSolutions(solutionTypes.SEQUENTIAL),
+      moveWinnerToOldAndReset
+    );
+  };
+
+  useEffect(() => {
+    resertScoreCaller();
+  }, [highestScores, sequentialTime]);
 
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
@@ -146,24 +238,96 @@ const EightQueensPuzzle = () => {
     return emptySlotCount;
   };
 
-  const gameOver = (moves: number, emptySlotsCount: number) => {
-    console.log("queenCount : ", queenCount);
+  const filteredMovesOfUser = () => {
+    let finalMoves: number[] = [];
+    finalMoves = board.map((row) => row.indexOf(1));
+
+    const finalMovesStr: string[] = finalMoves.map(String);
+
+    return finalMovesStr;
+  };
+
+  const isSolutionValidate = async (): Promise<boolean | null> => {
+    let allWinningMoves;
+    try {
+      allWinningMoves = await getAllWinningMoves();
+    } catch (e) {
+      setError({ header: "Error in Solution Validation", description: e });
+    }
+    const userMoves = filteredMovesOfUser();
+
+    const currentStr = JSON.stringify(userMoves);
+    if (allWinningMoves) {
+      return allWinningMoves.some(
+        (entry: any) => JSON.stringify(entry.moves) === currentStr
+      );
+    } else {
+      return null;
+    }
+  };
+
+  const handleGamePlay = async (
+    finalMoves: string[],
+    solutionType: SolutionRecognition,
+    gameStatus: gameStatusType
+  ) => {
+    try {
+      const userId = await saveGamePlay(
+        playerName,
+        finalMoves,
+        solutionTypes.GAME_PLAY,
+        elapsedTime,
+        gameStatus,
+        userType.GUEST_USER,
+        solutionType
+      );
+    } catch (e) {
+      setError({ header: "Error in save Game", description: e });
+    } finally {
+    }
+  };
+
+  const gameOver = async (moves: number, emptySlotsCount: number) => {
+    setIsGameEndingLoading(true);
+    const finalMoves = filteredMovesOfUser();
 
     if (queenCount + 1 === BOARD_SIZE) {
+      const isKnownSolution = await isSolutionValidate();
+
       setIsModalOpen(true);
-      setGameMessage("You won!");
+      if (isKnownSolution == null) {
+        setGameMessage(
+          "You have successfully solved the puzzle. However, an issue occurred during the game-winning validation. Please reload the page to see your name appear on the leaderboard."
+        );
+      } else {
+        setGameMessage(
+          isKnownSolution ? "This solution already exists!" : "You won!"
+        );
+      }
+
+      await handleGamePlay(
+        finalMoves,
+        isKnownSolution
+          ? SolutionRecognition.Known
+          : SolutionRecognition.Unique,
+        gameStatusType.WIN
+      );
     } else {
+      await handleGamePlay(
+        finalMoves,
+        SolutionRecognition.Variation,
+        gameStatusType.LOST
+      );
       setIsModalOpen(true);
-      setGameMessage("Game over! You are out of moves.");
+      const emptySlots = countEmptySlots();
+
+      if (emptySlots === 1) {
+        setGameMessage("Game over! So close! Only one move left.");
+      } else if (emptySlots > 0) {
+        setGameMessage("Game over! You are out of moves.");
+      }
     }
-
-    updateUserGameHistory({
-      playerName,
-      board,
-      elapsedTime,
-      gameMessage,
-    });
-
+    setIsGameEndingLoading(false);
     if (timerInterval) clearInterval(timerInterval);
   };
 
@@ -176,6 +340,8 @@ const EightQueensPuzzle = () => {
     setIsGameStarted(false);
     setStartTime(null);
     setElapsedTime(0);
+    setHintCount(2);
+    setHintVislbe(false);
     if (timerInterval) clearInterval(timerInterval);
   };
 
@@ -195,38 +361,167 @@ const EightQueensPuzzle = () => {
     setTimerInterval(interval);
   };
 
-  const updateUserGameHistory = (data: userGameSummary) => {
-    console.log("game history data : ", data);
-  };
-
-  const sendGameDataToServer = async () => {
-    const gameData: userGameSummary = {
-      playerName,
-      moves: board,
-      timeTaken: elapsedTime.toString(),
-      result: gameMessage.includes("won") ? "win" : "lose",
-    };
-
-    try {
-      await fetch("/api/save-game", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(gameData),
-      });
-    } catch (error) {
-      console.error("Error saving game data:", error);
-    }
-  };
-
   useEffect(() => {
     return () => {
       if (timerInterval) clearInterval(timerInterval);
     };
   }, [timerInterval]);
 
+  const getFilteredSolutions = async (
+    type: string
+  ): Promise<Solution | undefined> => {
+    try {
+      const existingSolutions = await getAllSolutions();
+      return existingSolutions.find((item: Solution) => item.method === type);
+    } catch (e) {
+      setError({ header: "error in filter solution", description: e });
+    }
+  };
+
+  const runWorkerAndSaveSolution = () => {
+    return new Promise<void>((resolve, reject) => {
+      const worker = new Worker(
+        new URL("./utils/workerThread", import.meta.url)
+      );
+      const n = Array(BOARD_SIZE).fill(-1).length;
+
+      const threadStart = performance.now();
+
+      worker.postMessage({ n });
+
+      worker.onmessage = async (e) => {
+        const workerResults: number[][] = e.data;
+
+        const threadEnd = performance.now();
+        const timeTaken = threadEnd - threadStart;
+
+        if (workerResults.length === 0) {
+          reject("No results returned from worker.");
+          worker.terminate();
+          return;
+        }
+
+        const solutionStrings = workerResults.map((solution) =>
+          solution.join(",")
+        );
+
+        const existingSolutions = await getFilteredSolutions(
+          solutionTypes.THREADED
+        );
+
+        if (existingSolutions && existingSolutions.timeTaken > timeTaken) {
+          setSequentialTime(timeTaken);
+          await deleteSolution(existingSolutions.id);
+        } else if (
+          existingSolutions &&
+          existingSolutions.timeTaken < timeTaken
+        ) {
+          setSequentialTime(existingSolutions.timeTaken);
+          return;
+        }
+
+        try {
+          await addGeneratedSolution(
+            solutionStrings,
+            solutionTypes.THREADED,
+            timeTaken
+          );
+
+          resolve();
+        } catch (error) {
+          console.error(`Error saving threaded solution:`, error);
+          reject(error);
+        } finally {
+          worker.terminate();
+        }
+      };
+
+      worker.onerror = (error) => {
+        console.error("Worker encountered an error:", error);
+        reject(error);
+        worker.terminate();
+      };
+    });
+  };
+
+  const storeSolutionsIfNew = async () => {
+    const backtrackingStart = performance.now();
+    const backtrackingResults = findAllNQueensSolutions(BOARD_SIZE);
+    const backtrackingEnd = performance.now();
+    const backtrackingTime = backtrackingEnd - backtrackingStart;
+    let latestTimeTaken;
+    let existingSolutions;
+    try {
+      existingSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
+
+      const stringifiedResults = backtrackingResults.results.map((solution) =>
+        solution.join(",")
+      );
+
+      if (
+        !existingSolutions ||
+        existingSolutions.timeTaken > backtrackingTime
+      ) {
+        latestTimeTaken = backtrackingTime;
+        await addGeneratedSolution(
+          stringifiedResults,
+          solutionTypes.SEQUENTIAL,
+          backtrackingTime
+        );
+      } else {
+        latestTimeTaken = existingSolutions.timeTaken;
+      }
+    } catch (error) {
+      console.error("Error saving backtracking solution:", error);
+    } finally {
+    }
+
+    if (existingSolutions && existingSolutions.timeTaken > backtrackingTime) {
+      await deleteSolution(existingSolutions.id);
+    }
+
+    setThreadedTime(latestTimeTaken || null);
+  };
+
+  const automationCalls = async () => {
+    try {
+      setIsLoading(true);
+      storeSolutionsIfNew();
+      runWorkerAndSaveSolution();
+    } catch (e) {
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    console.log("results ", findAllNQueensSolutions(BOARD_SIZE));
+    automationCalls();
   }, []);
+
+  const initialData = async () => {
+    let existingSolutions = await getFilteredSolutions(
+      solutionTypes.SEQUENTIAL
+    );
+    setAllBacktrackSolutions(existingSolutions?.solution);
+  };
+
+  useEffect(() => {
+    initialData();
+  }, []);
+
+  const getTheHint = async () => {
+    setHintVislbe(true);
+    if (hintCount > 0) {
+      setHintCount((pre) => pre - 1);
+      if (allBacktrackSolutions) {
+        const hint = getHintFromSolutions(
+          filteredMovesOfUser(),
+          allBacktrackSolutions
+        );
+        setCurrentHint(hint);
+      }
+    }
+  };
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -241,20 +536,81 @@ const EightQueensPuzzle = () => {
         {!isGameStarted && (
           <button
             onClick={handleStartGame}
-            className="w-32 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="text-white bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-purple-300 dark:focus:ring-purple-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
           >
             Start Game
           </button>
         )}
       </div>
 
+      <div className="flex justify-end text-gray-700">
+        <span>Sequential: </span>
+        <span className="font-medium text-blue-600">
+          {sequentialTime?.toFixed(4)}
+        </span>
+      </div>
+      <div className="flex justify-end text-gray-700">
+        <span>Threaded: </span>
+        <span className="font-medium text-green-600">
+          {threadedTime?.toFixed(4)}
+        </span>
+      </div>
+      {error && (
+        <div className="fixed bottom-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-[90%] max-w-md">
+          <div
+            id="alert-border-2"
+            className=" flex items-center p-4 mb-4 text-red-800 border-t-4 border-red-300 bg-red-50 dark:text-red-400 dark:bg-gray-800 dark:border-red-800"
+            role="alert"
+          >
+            <svg
+              className="shrink-0 w-4 h-4"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
+            </svg>
+            <div className="ms-3 text-sm font-medium">
+              {error.header}
+              <p className="font-semibold hover:no-underline">
+                {error.description}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ms-auto -mx-1.5 -my-1.5 bg-red-50 text-red-500 rounded-lg focus:ring-2 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex items-center justify-center h-8 w-8 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700"
+              data-dismiss-target="#alert-border-2"
+              aria-label="Close"
+              onClick={() => setError(null)}
+            >
+              <span className="sr-only">Dismiss</span>
+              <svg
+                className="w-3 h-3"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 14 14"
+              >
+                <path
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex justify-center mt-8">
-        <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-40 me-5 h-fit">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">Toolbar</h2>
+        <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-40 me-5 h-fit bg-gradient-to-b from-gray-800 via-gray-900 to-black">
+          <h2 className="text-lg font-semibold text-gray-200 mb-4">Toolbar</h2>
 
           <button
             onClick={handleRestart}
-            className="w-full mb-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="text-white bg-gradient-to-r from-pink-400 via-pink-500 to-pink-600 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-pink-300 dark:focus:ring-pink-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
             disabled={!isGameStarted}
           >
             Reset
@@ -264,51 +620,87 @@ const EightQueensPuzzle = () => {
             onClick={() => {
               setIsHelpModalOpen(true);
             }}
-            className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+            className="text-white bg-gradient-to-r from-lime-200 via-lime-400 to-lime-500 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-lime-300 dark:focus:ring-lime-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
           >
             Help
           </button>
+
           <button
             onClick={() => {
-              console.log("clicked hint");
+              getTheHint();
             }}
-            className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 mt-2"
+            className="text-white bg-gradient-to-r from-cyan-400 via-cyan-500 to-cyan-600 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-cyan-300 dark:focus:ring-cyan-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
+            disabled={hintCount === 0 || !isGameStarted}
           >
-            Hint
+            Hint <br />
+            <span className="text-white text-xs">
+              {hintCount > 0
+                ? `(${hintCount} remaining)`
+                : `(no hints are remaining)`}
+            </span>
           </button>
         </div>
-        <div className="grid grid-cols-8 gap-2">
-          {board.map((row, rowIndex) =>
-            row.map((cell, colIndex) => {
-              let buttonColor = "bg-gray-200";
-              if (cell === 1) {
-                buttonColor = "bg-[#03c300]";
-              } else if (cell === 2) {
-                buttonColor = "bg-[#bff3c4]";
-              }
+        {isGameEndingLoading ? (
+          <div className="grid grid-cols-8 gap-2">
+            {Array.from({ length: 8 }).map((_, rowIndex) =>
+              Array.from({ length: 8 }).map((_, colIndex) => (
+                <div
+                  key={`loader-${rowIndex}-${colIndex}`}
+                  className="w-16 h-16 bg-gray-300 rounded-lg animate-pulse"
+                ></div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-8 gap-2 p-4 bg-gradient-to-br from-gray-800 via-gray-900 to-black rounded-2xl shadow-inner">
+            {board.map((row, rowIndex) =>
+              row.map((cell, colIndex) => {
+                let buttonStyle =
+                  "bg-gradient-to-br from-gray-300 to-gray-400 text-gray-800";
+                let queen = null;
 
-              return (
-                <button
-                  key={`${rowIndex}-${colIndex}`}
-                  className={`w-16 h-16 ${buttonColor} hover:bg-opacity-80 rounded-lg flex items-center justify-center`}
-                  onClick={() => handleClick(rowIndex, colIndex)}
-                  disabled={!isGameStarted || cell === 1 || cell === 2}
-                >
-                  {cell === 1 ? <QueenIcon size={25} color="#ffffff" /> : null}
-                </button>
-              );
-            })
-          )}
-        </div>
-        <div className="flex flex-col items-center p-4 border rounded-lg shadow-lg w-64 ms-5">
+                if (cell === 1) {
+                  buttonStyle =
+                    "bg-gradient-to-br from-green-500 via-green-600 to-green-700 text-white shadow-lg";
+                  queen = <QueenIcon size={25} color="#ffffff" />;
+                } else if (cell === 2) {
+                  buttonStyle =
+                    "bg-gradient-to-br from-green-100 via-green-200 to-green-300 text-green-800";
+                }
+
+                const isHint =
+                  currentHint?.row === rowIndex &&
+                  currentHint?.col === colIndex;
+
+                return (
+                  <button
+                    key={`${rowIndex}-${colIndex}`}
+                    className={`w-16 h-16 ${buttonStyle} rounded-xl flex items-center justify-center transition-all duration-300 transform hover:scale-105
+            ${
+              isHint && hintVislbe ? "animate-blink ring-4 ring-yellow-400" : ""
+            }
+          `}
+                    onClick={() => {
+                      handleClick(rowIndex, colIndex), setHintVislbe(true);
+                    }}
+                    disabled={!isGameStarted || cell === 1 || cell === 2}
+                  >
+                    {queen}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+        <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-64 ms-5 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
           <div className="text-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Game Scoreboard</h2>
+            <h2 className="text-xl font-bold text-gray-200">Game Scoreboard</h2>
           </div>
 
           <div className="mb-4 w-full">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Remaining Moves:</span>
-              <span className="font-semibold text-blue-600">
+              <span className="text-sm text-gray-400">Remaining Moves:</span>
+              <span className="font-semibold text-blue-400">
                 {MOVES_LIMIT - queenCount}
               </span>
             </div>
@@ -316,52 +708,70 @@ const EightQueensPuzzle = () => {
 
           <div className="mb-4 w-full">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Total Empty Slots:</span>
-              <span className="font-semibold text-red-600">
+              <span className="text-sm text-gray-400">Total Empty Slots:</span>
+              <span className="font-semibold text-red-400">
                 {countEmptySlots()}
               </span>
             </div>
           </div>
 
-          <div className="w-full mb-6">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Value:</span>
-              <span className="font-semibold text-green-600">2</span>
-            </div>
-          </div>
-
-          <div className="w-full border-t pt-4 mt-2">
-            <h3 className="text-md font-semibold text-gray-700 mb-2">
-              Top 10 Scores
-            </h3>
-            {highestScores && highestScores.length > 0 ? (
-              <div className="space-y-2">
-                {highestScores
-                  .slice(0, 10)
-                  .map((score: ScoreEntry, index: number) => (
-                    <div
-                      key={index}
-                      className="flex justify-between text-sm text-gray-700"
-                    >
-                      <span className="w-1/3 truncate">{score.name}</span>
-                      <span className="w-1/3 text-center">{score.time}s</span>
-                      <span className="w-1/3 text-right">{score.date}</span>
+          <div className="w-full border-t border-gray-700 pt-4 mt-2">
+            {isScoreBoardLoading ? (
+              <div
+                role="status"
+                className="max-w-md p-4 space-y-4 border border-gray-600 divide-y divide-gray-700 rounded-sm shadow-sm animate-pulse"
+              >
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between pt-4"
+                  >
+                    <div>
+                      <div className="h-2.5 bg-gray-600 rounded-full w-24 mb-2.5"></div>
+                      <div className="w-32 h-2 bg-gray-700 rounded-full"></div>
                     </div>
-                  ))}
+                    <div className="h-2.5 bg-gray-700 rounded-full w-12"></div>
+                  </div>
+                ))}
+                <span className="sr-only">Loading...</span>
               </div>
             ) : (
-              <div className="text-sm text-gray-500 italic">
-                No scores recorded yet
-              </div>
+              <>
+                <h3 className="text-md font-semibold text-gray-200 mb-2">
+                  Top Scores
+                </h3>
+                {highestScores && highestScores.length > 0 ? (
+                  <div className="space-y-2">
+                    {highestScores
+                      .slice(0, 10)
+                      .map((score: ScoreEntry, index: number) => (
+                        <div
+                          key={index}
+                          className="flex justify-between text-sm text-gray-300"
+                        >
+                          <span className="w-1/3 truncate">{score.name}</span>
+                          <span className="w-1/3 text-center">
+                            {score.time}s
+                          </span>
+                          <span className="w-1/3 text-right">{score.date}</span>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-400 italic">
+                    No scores recorded yet
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
       </div>
 
       {isNameModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-black/70 via-gray-900/80 to-black/70 p-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-full max-w-md text-center">
+            <h3 className="text-2xl font-semibold text-gray-800 dark:text-white mb-5">
               Enter Your Name
             </h3>
             <input
@@ -369,10 +779,14 @@ const EightQueensPuzzle = () => {
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="Your name"
-              className="w-full px-4 py-2 mb-4 border rounded"
+              className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-3 mb-4 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
             />
             <button
-              className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+              className={
+                playerName.trim() !== ""
+                  ? "w-full text-white bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-3 transition-all shadow"
+                  : "w-full text-gray-400 bg-gray-200 cursor-not-allowed font-medium rounded-lg text-sm px-5 py-3 opacity-70"
+              }
               onClick={() => setIsNameModalOpen(false)}
               disabled={playerName.trim() === ""}
             >
@@ -417,43 +831,36 @@ const EightQueensPuzzle = () => {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center">
-            {gameMessage === "You won!" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-black/70 via-gray-900/80 to-black/70 p-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+            {(gameMessage === "You won!" ||
+              gameMessage === "Game over! You are out of moves.") && (
               <div className="mb-4 flex justify-center">
                 <Image
-                  src={WinImage}
-                  alt="You Won"
-                  width={100}
-                  height={100}
-                  className="mx-auto"
+                  src={gameMessage === "You won!" ? WinImage : LostImage}
+                  alt={gameMessage === "You won!" ? "You Won" : "Game Over"}
+                  width={120}
+                  height={120}
+                  className="mx-auto rounded-lg shadow-md object-contain"
                 />
               </div>
             )}
-            {gameMessage === "Game over! You are out of moves." && (
-              <div className="mb-4 flex justify-center">
-                <Image
-                  src={LostImage}
-                  alt="You Won"
-                  width={100}
-                  height={100}
-                  className="mx-auto"
-                />
-              </div>
-            )}
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">
-              {gameMessage} - Time: {formatTime(elapsedTime)}
+            <h3 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white mb-4">
+              {gameMessage}{" "}
+              <span className="block text-sm text-gray-500 dark:text-gray-300">
+                Time: {formatTime(elapsedTime)}
+              </span>
             </h3>
-            <div className="flex justify-center space-x-4">
+            <div className="flex justify-center space-x-3">
               <button
                 onClick={handleRestart}
-                className="px-4 py-2 bg-green-500 text-white rounded-md"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg shadow transition"
               >
                 Restart
               </button>
               <button
                 onClick={handleCancel}
-                className="px-4 py-2 bg-red-500 text-white rounded-md"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg shadow transition"
               >
                 Cancel
               </button>

@@ -8,6 +8,10 @@ import { GamePhase } from "../logic/types"
 import type { AdjacencyMatrix } from "../logic/adjacency-matrix"
 import { mdsClassic } from "../util/mds"
 
+// Store positions across all instances of the component to maintain consistency
+// This prevents re-visualization when switching between phases
+const globalCityPositions: Record<string, { x: number; y: number }> = {};
+
 interface CityMapProps {
   phase: GamePhase
   cities: City[]
@@ -16,6 +20,7 @@ interface CityMapProps {
   onCitySelect?: (cityId: string) => void
   onMapReady?: () => void
   highlightRoute?: string[]
+  homeCity?: string | null
 }
 
 // Define a neon color palette for edges
@@ -40,50 +45,241 @@ export function CityMap({
   onCitySelect,
   onMapReady,
   highlightRoute,
+  homeCity,
 }: CityMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { theme } = useTheme()
   const [isAnimating, setIsAnimating] = useState(false)
   const [cityPositions, setCityPositions] = useState<Record<string, { x: number; y: number }>>({})
+  // Flag to track if positions have been generated at least once
+  const [positionsGenerated, setPositionsGenerated] = useState(false)
+  // Create a unique key for this game instance
+  const gameInstanceRef = useRef<string>(Math.random().toString(36).substring(2, 15))
 
   // Calculate city positions based on distances
   useEffect(() => {
-    if (!cities.length || Object.keys(cityPositions).length > 0) {
-      return // Skip if we already have positions or no cities
-    }
+    if (!cities.length) return // No cities to render
 
-    setIsAnimating(true)
-
-    // Calculate initial positions using force-directed placement
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const width = canvas.offsetWidth
-    const height = canvas.offsetHeight
-
-    // Set canvas dimensions
-    canvas.width = width
-    canvas.height = height
-
-    // Clear canvas
+    canvas.width = canvas.offsetWidth
+    canvas.height = canvas.offsetHeight
+    
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Draw map background
-    const isDarkMode = theme === "dark"
-    drawMapBackground(ctx, width, height, isDarkMode)
+    // Check if we already have positions in the global store
+    const cityIds = cities.map(city => city.id).sort().join(',')
+    const hasGlobalPositions = Object.keys(globalCityPositions).length > 0 && 
+                               cities.every(city => city.id in globalCityPositions)
 
-    // Calculate positions incrementally
-    calculateAndAnimatePositions(ctx, cities, adjacencyMatrix, width, height, isDarkMode, phase, () => {
-      // Notify parent that map visualization is complete
-      if (phase === GamePhase.MAP_VISUALIZATION && onMapReady) {
+    // If positions exist globally or locally, use them
+    if (hasGlobalPositions || positionsGenerated) {
+      // Use existing positions, either from global store or component state
+      const positions = hasGlobalPositions ? globalCityPositions : cityPositions
+      
+      // Update local state if we're using global positions
+      if (hasGlobalPositions && Object.keys(cityPositions).length === 0) {
+        setCityPositions({...globalCityPositions})
+      }
+        
+      // Just redraw with current positions
+      redrawMap(
+        ctx,
+        canvas.width,
+        canvas.height,
+        cities,
+        positions,
+        adjacencyMatrix,
+        theme === "dark",
+        phase,
+        currentRoute,
+        highlightRoute,
+        homeCity
+      )
+      
+      // If we've just loaded saved positions and we're in the map visualization phase, 
+      // notify that we're ready
+      if (phase === GamePhase.MAP_VISUALIZATION && !positionsGenerated && onMapReady) {
+        setPositionsGenerated(true)
+        setTimeout(() => {
+          onMapReady()
+        }, 500) // Small delay to ensure UI updates
+      }
+      
+      return
+    }
+
+    // Only calculate new positions if we haven't done so before
+    // and we're in the MAP_VISUALIZATION phase
+    if (!positionsGenerated && phase === GamePhase.MAP_VISUALIZATION) {
+      setIsAnimating(true)
+
+      // Draw map background
+      const isDarkMode = theme === "dark"
+      drawMapBackground(ctx, canvas.width, canvas.height, isDarkMode)
+
+      // Calculate positions (MDS or force-directed)
+      if (adjacencyMatrix && cities.length > 1) {
+        // Use MDS for true distance-based layout
+        const cityIds = cities.map(c => c.id)
+        const distMatrix = cityIds.map(id1 => cityIds.map(id2 => adjacencyMatrix.getDistance(id1, id2)))
+        
+        try {
+          // Run MDS
+          const mdsCoords = mdsClassic(distMatrix, 2)
+          
+          // Find bounds
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+          mdsCoords.forEach(({x, y}) => {
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+            if (y < minY) minY = y
+            if (y > maxY) maxY = y
+          })
+          
+          // Scale and center to fit canvas
+          const padding = 60
+          const plotW = canvas.width - 2 * padding
+          const plotH = canvas.height - 2 * padding
+          const scaleX = plotW / (maxX - minX || 1)
+          const scaleY = plotH / (maxY - minY || 1)
+          const scale = Math.min(scaleX, scaleY)
+          
+          // Create positions object
+          const newPositions: Record<string, { x: number; y: number }> = {}
+          mdsCoords.forEach((coord, i) => {
+            newPositions[cityIds[i]] = {
+              x: padding + (coord.x - minX) * scale,
+              y: padding + (coord.y - minY) * scale,
+            }
+          })
+          
+          // Ensure cities aren't too close to each other
+          ensureCitySeparation(newPositions, 80) // Minimum 80px between cities
+          
+          // Update local positions state
+          setCityPositions(newPositions)
+          
+          // Save to global positions store
+          Object.assign(globalCityPositions, newPositions)
+          
+          // Mark positions as generated so we don't recalculate
+          setPositionsGenerated(true)
+          
+          // Animate drawing
+          animateDrawing(ctx, canvas.width, canvas.height, cities, newPositions, 
+                        adjacencyMatrix, isDarkMode, phase, () => {
+            setIsAnimating(false)
+            if (onMapReady) {
+              onMapReady()
+            }
+          })
+        } catch (e) {
+          console.error("MDS calculation failed:", e)
+          fallbackPositioning()
+        }
+      } else {
+        // Fallback to simple circular layout
+        fallbackPositioning()
+      }
+    }
+    
+    // Fallback positioning function (circular layout)
+    function fallbackPositioning() {
+      // Calculate positions in a circle
+      const newPositions: Record<string, { x: number; y: number }> = {}
+      const centerX = canvas.width / 2
+      const centerY = canvas.height / 2
+      const radius = Math.min(canvas.width, canvas.height) * 0.4 - 30
+      
+      cities.forEach((city, i) => {
+        const angle = (i / cities.length) * 2 * Math.PI
+        newPositions[city.id] = {
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle),
+        }
+      })
+      
+      // Update local positions state
+      setCityPositions(newPositions)
+      
+      // Save to global positions store
+      Object.assign(globalCityPositions, newPositions)
+      
+      // Mark positions as generated
+      setPositionsGenerated(true)
+      
+      // Draw the map with the new positions
+      redrawMap(
+        ctx,
+        canvas.width,
+        canvas.height,
+        cities,
+        newPositions,
+        adjacencyMatrix,
+        theme === "dark",
+        phase,
+        currentRoute,
+        highlightRoute,
+        homeCity
+      )
+      
+      setIsAnimating(false)
+      if (onMapReady) {
         onMapReady()
       }
-    })
-  }, [cities, adjacencyMatrix, theme, phase, onMapReady])
+    }
+  }, [cities, adjacencyMatrix, theme, phase, onMapReady, currentRoute, highlightRoute, homeCity, positionsGenerated])
+
+  // Ensure cities maintain minimum separation
+  function ensureCitySeparation(
+    positions: Record<string, { x: number; y: number }>, 
+    minDistance: number
+  ) {
+    const cityIds = Object.keys(positions)
+    let adjustmentMade = true
+    const iterations = 20 // Limit iterations to avoid infinite loop
+    
+    for (let iter = 0; iter < iterations && adjustmentMade; iter++) {
+      adjustmentMade = false
+      
+      for (let i = 0; i < cityIds.length; i++) {
+        for (let j = i + 1; j < cityIds.length; j++) {
+          const id1 = cityIds[i]
+          const id2 = cityIds[j]
+          const pos1 = positions[id1]
+          const pos2 = positions[id2]
+          
+          const dx = pos2.x - pos1.x
+          const dy = pos2.y - pos1.y
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          
+          if (distance < minDistance) {
+            adjustmentMade = true
+            
+            // Calculate unit vector
+            const ux = dx / distance
+            const uy = dy / distance
+            
+            // Calculate push distance (half for each city)
+            const pushDistance = (minDistance - distance) / 2
+            
+            // Push cities apart
+            pos1.x -= ux * pushDistance
+            pos1.y -= uy * pushDistance
+            pos2.x += ux * pushDistance
+            pos2.y += uy * pushDistance
+          }
+        }
+      }
+    }
+  }
 
   // Draw the current route when it changes
   useEffect(() => {
+    // Don't redraw if we're still animating or no positions available
     if (Object.keys(cityPositions).length === 0 || isAnimating) return
 
     const canvas = canvasRef.current
@@ -104,627 +300,106 @@ export function CityMap({
       phase,
       currentRoute,
       highlightRoute,
+      homeCity,
     )
-  }, [cities, cityPositions, adjacencyMatrix, theme, currentRoute, isAnimating, highlightRoute, phase])
+  }, [cities, cityPositions, adjacencyMatrix, theme, currentRoute, isAnimating, highlightRoute, phase, homeCity])
 
-  // Calculate and animate city positions
-  const calculateAndAnimatePositions = (
+  // Animate drawing the map
+  function animateDrawing(
     ctx: CanvasRenderingContext2D,
-    cities: City[],
-    adjacencyMatrix: AdjacencyMatrix | null | undefined,
     width: number,
     height: number,
+    cities: City[],
+    positions: Record<string, { x: number; y: number }>,
+    adjacencyMatrix: AdjacencyMatrix | null | undefined,
     isDarkMode: boolean,
     phase: GamePhase,
-    onComplete: () => void,
-  ) => {
-    // If we have an adjacency matrix, use MDS for true distance-based layout
-    if (adjacencyMatrix && cities.length > 1) {
-      // Build distance matrix
-      const cityIds = cities.map(c => c.id);
-      const distMatrix = cityIds.map(id1 => cityIds.map(id2 => adjacencyMatrix.getDistance(id1, id2)));
-      // Run MDS
-      const mdsCoords = mdsClassic(distMatrix, 2);
-      // Find bounds
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      mdsCoords.forEach(({x, y}) => {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      });
-      // Scale and center to fit canvas
-      const padding = 60;
-      const plotW = width - 2 * padding;
-      const plotH = height - 2 * padding;
-      const scaleX = plotW / (maxX - minX || 1);
-      const scaleY = plotH / (maxY - minY || 1);
-      const scale = Math.min(scaleX, scaleY);
-      const positions: Record<string, { x: number; y: number }> = {};
-      mdsCoords.forEach((coord, i) => {
-        positions[cityIds[i]] = {
-          x: padding + (coord.x - minX) * scale,
-          y: padding + (coord.y - minY) * scale,
-        };
-      });
-      setCityPositions(positions);
-      setIsAnimating(false);
-      onComplete();
-      return;
-    }
-    // Calculate a global scale factor for visualization based on canvas size
-    const calculateScaleFactor = (cities: City[], adjacencyMatrix: AdjacencyMatrix | null | undefined, width: number, height: number) => {
-      if (!adjacencyMatrix) return 1;
-      
-      // Find total sum of distances and max distance
-      let totalDistance = 0;
-      let maxDistance = 0;
-      let minDistance = Infinity;
-      let connections = 0;
-      
-      for (let i = 0; i < cities.length; i++) {
-        for (let j = i + 1; j < cities.length; j++) {
-          const dist = adjacencyMatrix.getDistance(cities[i].id, cities[j].id);
-          totalDistance += dist;
-          maxDistance = Math.max(maxDistance, dist);
-          minDistance = Math.min(minDistance, dist);
-          connections++;
-        }
-      }
-      
-      // Available canvas space with minimal padding
-      const padding = 60; // Reduced padding to use more space
-      const availableWidth = width - 2 * padding;
-      const availableHeight = height - 2 * padding;
-      
-      // Calculate average distance
-      const avgDistance = connections > 0 ? totalDistance / connections : 50;
-      const cityCount = cities.length;
-      
-      // Use a much more aggressive scaling factor to spread cities wider
-      // For fewer cities, we can use an even larger scale
-      const baseScaleFactor = 0.8; // Lower is more spread out
-      const cityCountFactor = 10 / (cityCount + 5); // More spread for fewer cities
-      
-      // Calculate scale based on canvas size and distances
-      // We want the graph to use at least 75-80% of the canvas
-      const canvasDimension = Math.min(availableWidth, availableHeight);
-      
-      // Make largest distance take up a significant portion of the canvas
-      // More cities = slightly smaller scale to prevent overlap
-      const scaleFactor = (canvasDimension * 0.75) / (maxDistance * baseScaleFactor) * cityCountFactor;
-      
-      console.log(`Canvas: ${width}x${height}, Cities: ${cityCount}, Scale: ${scaleFactor.toFixed(3)}, Max Dist: ${maxDistance}, Min Dist: ${minDistance}`);
-      
-      // Return a larger scale factor to spread cities more
-      return Math.min(Math.max(scaleFactor, 1.0), 12.0);  // Higher minimum and maximum
-    };
-
-    // Calculate the scale factor once at initialization - this is critical to ensure consistent visualization
-    const globalScaleFactor = calculateScaleFactor(cities, adjacencyMatrix, width, height);
-
-    // Initial positions in a circle with spacing based on canvas
-    const positions: Record<string, { x: number; y: number }> = {}
-    const padding = 100; // Safe padding from edges
-    const effectiveWidth = width - 2 * padding;
-    const effectiveHeight = height - 2 * padding;
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    // Use radius based on available space and number of cities
-    const radius = Math.min(effectiveWidth, effectiveHeight) * 0.4;
-
-    // Place cities in a circle
-    cities.forEach((city, index) => {
-      const angle = (index / cities.length) * 2 * Math.PI;
-      positions[city.id] = {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle),
-      };
-    });
-
-    // Save the global scale factor for use in force calculations
-    const scaledDistances: Record<string, Record<string, number>> = {};
+    onComplete: () => void
+  ) {
+    const drawnEdges = new Set<string>()
+    const cityIds = cities.map(city => city.id)
+    let edgeIndex = 0
+    let cityIndex = 0
+    let animationFrame: number
     
-    if (adjacencyMatrix) {
-      // Pre-compute scaled distances once to avoid repeated calculations
-      cities.forEach(city1 => {
-        scaledDistances[city1.id] = {};
-        cities.forEach(city2 => {
-          if (city1.id !== city2.id) {
-            // Scale the distance by our global factor
-            scaledDistances[city1.id][city2.id] = 
-              adjacencyMatrix.getDistance(city1.id, city2.id) * globalScaleFactor;
-          }
-        });
-      });
-    }
-
-    // Animate adding cities one by one
-    let currentCityIndex = 0;
-    const addedCities: string[] = [];
-    const drawnEdges = new Set<string>();
-
-    const addNextCity = () => {
-      if (currentCityIndex >= cities.length) {
-        // All cities added, now optimize positions if we have an adjacency matrix
-        if (adjacencyMatrix) {
-          // Pass the scaled distances to the optimization function
-          optimizePositions(
-            positions, 
-            cities, 
-            adjacencyMatrix, 
-            width, 
-            height, 
-            addedCities, 
-            scaledDistances, 
-            (newPositions) => {
-              setCityPositions(newPositions);
-              setIsAnimating(false);
-              onComplete();
-            }
-          );
-        } else {
-          setCityPositions(positions);
-          setIsAnimating(false);
-          onComplete();
-        }
-        return;
+    function drawNextElement() {
+      if (!adjacencyMatrix) {
+        drawAllCities()
+        onComplete()
+        return
       }
-
-      const currentCity = cities[currentCityIndex];
-      addedCities.push(currentCity.id);
-
-      // Draw connections to all previously added cities if we have an adjacency matrix
-      if (adjacencyMatrix) {
-        for (let i = 0; i < currentCityIndex; i++) {
-          const previousCity = cities[i];
-          const distance = adjacencyMatrix.getDistance(previousCity.id, currentCity.id);
-
+      
+      // First draw all edges
+      if (edgeIndex < cityIds.length * (cityIds.length - 1) / 2) {
+        let i = 0, j = 1
+        let count = 0
+        
+        // Find the i,j indices for the current edge index
+        while (count < edgeIndex) {
+          j++
+          if (j >= cityIds.length) {
+            i++
+            j = i + 1
+          }
+          count++
+        }
+        
+        if (i < cityIds.length && j < cityIds.length) {
+          const city1Id = cityIds[i]
+          const city2Id = cityIds[j]
+          
+          // Draw the connection
           drawConnection(
             ctx,
-            positions[previousCity.id],
-            positions[currentCity.id],
-            distance,
-            i,
+            positions[city1Id],
+            positions[city2Id],
+            adjacencyMatrix.getDistance(city1Id, city2Id),
+            edgeIndex,
             isDarkMode,
             drawnEdges,
-            previousCity.id,
-            currentCity.id,
-          );
-        }
-      }
-
-      // Draw the city node
-      drawCityNode(ctx, currentCity, positions[currentCity.id], isDarkMode, phase);
-
-      // Update positions based on forces if we have an adjacency matrix
-      if (adjacencyMatrix && currentCityIndex > 0) {
-        const tempPositions = { ...positions };
-        
-        // Use the scaled distances in force calculation
-        applyForces(tempPositions, addedCities, adjacencyMatrix, width, height, scaledDistances);
-
-        // Redraw everything with updated positions
-        ctx.clearRect(0, 0, width, height);
-        drawMapBackground(ctx, width, height, isDarkMode);
-
-        // Redraw all edges
-        drawnEdges.clear();
-        for (let i = 0; i < addedCities.length; i++) {
-          for (let j = i + 1; j < addedCities.length; j++) {
-            const city1 = addedCities[i];
-            const city2 = addedCities[j];
-            const distance = adjacencyMatrix.getDistance(city1, city2);
-
-            drawConnection(
-              ctx,
-              tempPositions[city1],
-              tempPositions[city2],
-              distance,
-              i * cities.length + j,
-              isDarkMode,
-              drawnEdges,
-              city1,
-              city2,
-            );
-          }
-        }
-
-        // Redraw all cities
-        for (let i = 0; i < addedCities.length; i++) {
-          const cityId = addedCities[i];
-          const city = cities.find((c) => c.id === cityId);
-          if (city) {
-            drawCityNode(ctx, city, tempPositions[cityId], isDarkMode, phase);
-          }
-        }
-
-        // Update positions
-        Object.assign(positions, tempPositions);
-      }
-
-      // Move to next city
-      currentCityIndex++;
-
-      // Schedule next city with a delay
-      setTimeout(addNextCity, 300);
-    };
-
-    // Start the animation
-    addNextCity();
-  }
-
-  // Apply forces to optimize positions
-  const applyForces = (
-    positions: Record<string, { x: number; y: number }>,
-    cityIds: string[],
-    adjacencyMatrix: AdjacencyMatrix,
-    width: number,
-    height: number,
-    scaledDistances: Record<string, Record<string, number>>,
-  ) => {
-    // Safe padding to keep cities away from edges
-    const padding = 100
-    const forces: Record<string, { x: number; y: number }> = {}
-
-    // Initialize forces
-    cityIds.forEach((cityId) => {
-      forces[cityId] = { x: 0, y: 0 }
-    })
-
-    // Apply distance-based forces using pre-scaled distances
-    cityIds.forEach((city1) => {
-      cityIds.forEach((city2) => {
-        if (city1 === city2) return
-
-        const pos1 = positions[city1]
-        const pos2 = positions[city2]
-
-        const dx = pos2.x - pos1.x
-        const dy = pos2.y - pos1.y
-        // Ensure we don't divide by zero
-        const actualDistance = Math.sqrt(dx * dx + dy * dy) || 0.001
-
-        // Get the pre-scaled desired distance - this already has the canvas size factor built in
-        const desiredDistance = scaledDistances[city1][city2]
-        
-        // Calculate force - use a small coefficient to prevent overshooting
-        const forceMagnitude = ((actualDistance - desiredDistance) / actualDistance) * 0.2
-        
-        // Apply bounded forces
-        forces[city1].x += dx * forceMagnitude
-        forces[city1].y += dy * forceMagnitude
-        forces[city2].x -= dx * forceMagnitude
-        forces[city2].y -= dy * forceMagnitude
-      })
-    })
-
-    // Apply repulsive forces to prevent overlapping - based on number of cities
-    const nodeRadius = 25 // Match the node radius in drawCityNode
-    const minSeparation = nodeRadius * 3 // Ensure at least 3x node radius between cities
-    
-    cityIds.forEach((city1) => {
-      cityIds.forEach((city2) => {
-        if (city1 === city2) return
-
-        const pos1 = positions[city1]
-        const pos2 = positions[city2]
-
-        const dx = pos2.x - pos1.x
-        const dy = pos2.y - pos1.y
-        const distance = Math.sqrt(dx * dx + dy * dy) || 0.001
-
-        // Strong repulsion when cities are too close
-        if (distance < minSeparation) {
-          // Safe repulsion calculation
-          const repulsionStrength = Math.min(1.5 * (1 - distance / minSeparation) / distance, 0.5)
-          
-          forces[city1].x -= dx * repulsionStrength
-          forces[city1].y -= dy * repulsionStrength
-          forces[city2].x += dx * repulsionStrength
-          forces[city2].y += dy * repulsionStrength
-        }
-      })
-    })
-
-    // Apply boundary forces to keep cities within canvas
-    cityIds.forEach((cityId) => {
-      const pos = positions[cityId]
-
-      // Strong correction if outside boundaries
-      if (pos.x < padding) {
-        forces[cityId].x += 0.5 * (padding - pos.x)
-      }
-      if (pos.x > width - padding) {
-        forces[cityId].x -= 0.5 * (pos.x - (width - padding))
-      }
-      if (pos.y < padding) {
-        forces[cityId].y += 0.5 * (padding - pos.y)
-      }
-      if (pos.y > height - padding) {
-        forces[cityId].y -= 0.5 * (pos.y - (height - padding))
-      }
-    })
-
-    // Add weak central gravity to prevent cities from drifting too far apart
-    const centerX = width / 2
-    const centerY = height / 2
-    const gravitationalConstant = 0.0005
-    
-    cityIds.forEach((cityId) => {
-      const pos = positions[cityId]
-      const dx = centerX - pos.x
-      const dy = centerY - pos.y
-      const distance = Math.sqrt(dx * dx + dy * dy) || 0.001
-      
-      forces[cityId].x += (dx / distance) * gravitationalConstant * distance
-      forces[cityId].y += (dy / distance) * gravitationalConstant * distance
-    })
-
-    // Apply forces with damping and capping to prevent instability
-    const damping = 0.7
-    cityIds.forEach((cityId) => {
-      const force = forces[cityId]
-      const magnitude = Math.sqrt(force.x * force.x + force.y * force.y)
-      
-      // Cap maximum force to prevent extreme movements
-      const maxForce = 10
-      if (magnitude > maxForce) {
-        const scale = maxForce / magnitude
-        force.x *= scale
-        force.y *= scale
-      }
-      
-      // Apply damped force
-      positions[cityId].x += force.x * damping
-      positions[cityId].y += force.y * damping
-    })
-  }
-
-  // Optimize positions using force-directed algorithm
-  const optimizePositions = (
-    initialPositions: Record<string, { x: number; y: number }>,
-    cities: City[],
-    adjacencyMatrix: AdjacencyMatrix,
-    width: number,
-    height: number,
-    cityIds: string[],
-    scaledDistances: Record<string, Record<string, number>>,
-    callback: (positions: Record<string, { x: number; y: number }>) => void,
-  ) => {
-     // Make a deep copy to preserve initial positions
-    const positions = JSON.parse(JSON.stringify(initialPositions));
-    
-    // Save a copy of initial positions to blend with during optimization
-    // This helps maintain the initial structure and prevents collapse
-    const originalPositions = JSON.parse(JSON.stringify(initialPositions));
-    
-    // Fewer iterations to avoid over-optimization which can lead to collapse
-    const baseIterations = 80
-    const cityCount = cityIds.length
-    const iterations = baseIterations + cityCount * 5
-    
-    // Track convergence to avoid unnecessary iterations
-    let stabilityCounter = 0
-    let previousPositions: Record<string, { x: number; y: number }> = {}
-    let currentIteration = 0
-
-    // Copy current positions
-    cityIds.forEach(id => {
-      previousPositions[id] = { ...positions[id] }
-    })
-    
-    // Debug logging
-    console.log("Starting optimization with", cityCount, "cities and", iterations, "iterations");
-    
-    // Function to check if any cities are too close to each other
-    const checkCityProximity = () => {
-      const minAcceptableDistance = 50; // Minimum distance between cities
-      let tooClose = false;
-      
-      // Check distances between all city pairs
-      for (let i = 0; i < cityIds.length; i++) {
-        for (let j = i + 1; j < cityIds.length; j++) {
-          const city1 = cityIds[i];
-          const city2 = cityIds[j];
-          const pos1 = positions[city1];
-          const pos2 = positions[city2];
-          
-          const dx = pos2.x - pos1.x;
-          const dy = pos2.y - pos1.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          if (distance < minAcceptableDistance) {
-            tooClose = true;
-            // Apply a separation force
-            const separation = (minAcceptableDistance - distance) / 2;
-            const angle = Math.atan2(dy, dx);
-            
-            pos1.x -= separation * Math.cos(angle);
-            pos1.y -= separation * Math.sin(angle);
-            pos2.x += separation * Math.cos(angle);
-            pos2.y += separation * Math.sin(angle);
-          }
-        }
-      }
-      
-      return tooClose;
-    }
-
-    const runIteration = () => {
-      // Stop conditions: max iterations or stable configuration
-      if (currentIteration >= iterations || stabilityCounter >= 10) {
-        // Final sanity checks and adjustments
-        const spreadFactor = checkAndFixCollapse(positions, originalPositions, width, height);
-        if (spreadFactor > 1) {
-          console.log(`Applied collapse fix with spread factor: ${spreadFactor}`);
+            city1Id,
+            city2Id
+          )
         }
         
-        // Fix any cities that are too close to each other
-        for (let i = 0; i < 5; i++) {
-          if (!checkCityProximity()) break;
+        edgeIndex++
+        animationFrame = requestAnimationFrame(drawNextElement)
+      }
+      // Then draw all cities
+      else if (cityIndex < cityIds.length) {
+        const city = cities.find(c => c.id === cityIds[cityIndex])
+        if (city) {
+          const isHomeCity = city.id === homeCity
+          drawCityNode(ctx, city, positions[city.id], isDarkMode, phase, false, false, isHomeCity)
         }
         
-        // Ensure all cities are within bounds
-        ensureCitiesInBounds(positions, width, height, 60)
-        
-        // Check for non-finite positions
-        cityIds.forEach(id => {
-          if (!isFinite(positions[id].x) || !isFinite(positions[id].y)) {
-            console.warn(`Found non-finite position for city ${id}, resetting to original position`);
-            positions[id] = { ...originalPositions[id] };
-          }
-        })
-        
-        console.log("Optimization complete after", currentIteration, "iterations");
-        callback(positions);
-        return;
+        cityIndex++
+        animationFrame = requestAnimationFrame(drawNextElement)
       }
-
-      // Progressive strength - start strong then fade, encourages convergence
-      // but avoids destruction of initial structure
-      const progressFactor = Math.max(0.1, 1 - (currentIteration / iterations) * 1.2);
-      
-      // Apply forces
-      applyForcesWithStrength(positions, cityIds, adjacencyMatrix, width, height, progressFactor, scaledDistances);
-      
-      // Blend with original positions to maintain structure
-      // This is critical to prevent collapse - weight decreases over time
-      const originalWeight = Math.max(0, 0.2 - (currentIteration / iterations) * 0.2);
-      if (originalWeight > 0) {
-        cityIds.forEach(id => {
-          positions[id].x = positions[id].x * (1 - originalWeight) + originalPositions[id].x * originalWeight;
-          positions[id].y = positions[id].y * (1 - originalWeight) + originalPositions[id].y * originalWeight;
-        });
+      // Animation complete
+      else {
+        onComplete()
       }
-      
-      currentIteration++;
-
-      // Check if positions have stabilized
-      let totalMovement = 0;
-      cityIds.forEach(id => {
-        const dx = positions[id].x - previousPositions[id].x;
-        const dy = positions[id].y - previousPositions[id].y;
-        totalMovement += Math.sqrt(dx * dx + dy * dy);
-        
-        // Update previous positions
-        previousPositions[id] = { ...positions[id] };
-      });
-      
-      // If movement is very small, increment stability counter
-      if (totalMovement / cityIds.length < 0.5) {
-        stabilityCounter++;
-      } else {
-        stabilityCounter = 0;
-      }
-
-      // Use requestAnimationFrame for smoother animation
-      requestAnimationFrame(runIteration);
     }
     
-    // Function to check if cities have collapsed and fix it
-    const checkAndFixCollapse = (
-      positions: Record<string, { x: number; y: number }>,
-      originalPositions: Record<string, { x: number; y: number }>,
-      width: number,
-      height: number
-    ) => {
-      // Find the current spread of cities
-      let minX = width;
-      let maxX = 0;
-      let minY = height;
-      let maxY = 0;
-      
-      Object.values(positions).forEach(pos => {
-        minX = Math.min(minX, pos.x);
-        maxX = Math.max(maxX, pos.x);
-        minY = Math.min(minY, pos.y);
-        maxY = Math.max(maxY, pos.y);
-      });
-      
-      const spreadX = maxX - minX;
-      const spreadY = maxY - minY;
-      
-      // If spread is too small, cities have collapsed
-      const minSpread = Math.min(width, height) * 0.4; // Cities should take up at least 40% of canvas
-      
-      if (spreadX < minSpread || spreadY < minSpread) {
-        console.warn("Detected city collapse! Fixing...");
-        
-        // Calculate center of current positions
-        let centerX = (minX + maxX) / 2;
-        let centerY = (minY + maxY) / 2;
-        
-        // Calculate spread factor needed
-        const spreadFactor = Math.max(
-          minSpread / Math.max(1, spreadX),
-          minSpread / Math.max(1, spreadY)
-        ) * 1.2; // Add 20% extra space
-        
-        // Apply spread transformation from the center
-        Object.keys(positions).forEach(cityId => {
-          const dx = positions[cityId].x - centerX;
-          const dy = positions[cityId].y - centerY;
-          
-          positions[cityId].x = centerX + dx * spreadFactor;
-          positions[cityId].y = centerY + dy * spreadFactor;
-        });
-        
-        return spreadFactor;
-      }
-      
-      return 1; // No spread needed
-    };
-
-    // Start the optimization process
-    runIteration();
-  }
-
-  // Ensure all cities are within the canvas boundaries
-  const ensureCitiesInBounds = (
-    positions: Record<string, { x: number; y: number }>,
-    width: number,
-    height: number,
-    padding: number
-  ) => {
-    Object.keys(positions).forEach(cityId => {
-      const pos = positions[cityId]
-      
-      // Adjust x position if too close to edges
-      if (pos.x < padding) {
-        pos.x = padding
-      } else if (pos.x > width - padding) {
-        pos.x = width - padding
-      }
-      
-      // Adjust y position if too close to edges
-      if (pos.y < padding) {
-        pos.y = padding
-      } else if (pos.y > height - padding) {
-        pos.y = height - padding
-      }
-    })
-  }
-  
-  // Apply forces with a strength factor
-  const applyForcesWithStrength = (
-    positions: Record<string, { x: number; y: number }>,
-    cityIds: string[],
-    adjacencyMatrix: AdjacencyMatrix,
-    width: number,
-    height: number,
-    strengthFactor: number,
-    scaledDistances: Record<string, Record<string, number>>,
-  ) => {
-    const tempPositions = { ...positions }
-    applyForces(tempPositions, cityIds, adjacencyMatrix, width, height, scaledDistances)
+    function drawAllCities() {
+      cities.forEach(city => {
+        const isHomeCity = city.id === homeCity
+        drawCityNode(ctx, city, positions[city.id], isDarkMode, phase, false, false, isHomeCity)
+      })
+    }
     
-    // Apply changes with gradually decreasing strength
-    cityIds.forEach(id => {
-      positions[id].x += (tempPositions[id].x - positions[id].x) * strengthFactor
-      positions[id].y += (tempPositions[id].y - positions[id].y) * strengthFactor
-    })
+    // Clear and draw background
+    ctx.clearRect(0, 0, width, height)
+    drawMapBackground(ctx, width, height, isDarkMode)
+    
+    // Start animation
+    drawNextElement()
+    
+    // Cleanup function to cancel animation if component unmounts
+    return () => {
+      cancelAnimationFrame(animationFrame)
+    }
   }
 
   // Handle click on a city
@@ -761,6 +436,7 @@ export function CityMap({
             phase,
             currentRoute,
             highlightRoute,
+            homeCity,
           )
         }
         break
@@ -811,6 +487,7 @@ function redrawMap(
   phase: GamePhase,
   currentRoute: string[] = [],
   highlightRoute?: string[],
+  homeCity?: string | null,
 ) {
   // Clear canvas
   ctx.clearRect(0, 0, width, height)
@@ -872,8 +549,9 @@ function redrawMap(
   cities.forEach((city) => {
     const isInRoute = currentRoute.includes(city.id)
     const isStartCity = currentRoute.length > 0 && currentRoute[0] === city.id
+    const isHomeCity = city.id === homeCity
 
-    drawCityNode(ctx, city, cityPositions[city.id], isDarkMode, phase, isInRoute, isStartCity)
+    drawCityNode(ctx, city, cityPositions[city.id], isDarkMode, phase, isInRoute, isStartCity, isHomeCity)
   })
 }
 
@@ -1095,14 +773,16 @@ function drawCityNode(
   phase: GamePhase,
   isInRoute = false,
   isStartCity = false,
+  isHomeCity = false,  // Added isHomeCity parameter
 ) {
   // Reduced node radius while maintaining good visibility
   const nodeRadius = 25
 
   // Create a subtle glow effect
   if (isDarkMode) {
-    ctx.shadowColor = isStartCity ? "#10B981" : isInRoute ? "#8B5CF6" : city.selected ? "#3B82F6" : "#4B5563"
-    ctx.shadowBlur = 12
+    // Choose glow color based on city status - home city gets a gold glow
+    ctx.shadowColor = isHomeCity ? "#FFD700" : isStartCity ? "#10B981" : isInRoute ? "#8B5CF6" : city.selected ? "#3B82F6" : "#4B5563"
+    ctx.shadowBlur = isHomeCity ? 15 : 12  // Stronger glow for home city
   }
 
   // Draw city circle with gradient
@@ -1115,7 +795,11 @@ function drawCityNode(
     nodeRadius,
   )
 
-  if (isStartCity) {
+  if (isHomeCity) {
+    // Home city in gold
+    gradient.addColorStop(0, isDarkMode ? "#FFDF00" : "#FFD700")  // Gold
+    gradient.addColorStop(1, isDarkMode ? "#B8860B" : "#DAA520")  // Darker gold
+  } else if (isStartCity) {
     // Start city in green
     gradient.addColorStop(0, isDarkMode ? "#34D399" : "#10B981")
     gradient.addColorStop(1, isDarkMode ? "#059669" : "#047857")
@@ -1138,9 +822,11 @@ function drawCityNode(
   ctx.fillStyle = gradient
   ctx.fill()
 
-  // Add a subtle border
-  ctx.strokeStyle = isDarkMode ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"
-  ctx.lineWidth = 2
+  // Add a subtle border - gold for home city
+  ctx.strokeStyle = isHomeCity 
+    ? (isDarkMode ? "rgba(255, 215, 0, 0.8)" : "rgba(218, 165, 32, 0.8)")  
+    : (isDarkMode ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)")
+  ctx.lineWidth = isHomeCity ? 3 : 2  // Thicker border for home city
   ctx.stroke()
 
   // Add an inner ring for selected cities for better visual feedback
@@ -1150,6 +836,31 @@ function drawCityNode(
     ctx.strokeStyle = isDarkMode ? "#FFFFFF" : "#000000"
     ctx.lineWidth = 1.5
     ctx.stroke()
+  }
+
+  // Add a "home" indicator for home city
+  if (isHomeCity) {
+    // Draw a home icon or symbol
+    const homeSize = 10;
+    
+    // Draw a little house shape
+    ctx.beginPath();
+    // Roof
+    ctx.moveTo(position.x, position.y - nodeRadius - 5);
+    ctx.lineTo(position.x - homeSize, position.y - nodeRadius + 5);
+    ctx.lineTo(position.x + homeSize, position.y - nodeRadius + 5);
+    ctx.closePath();
+    
+    ctx.fillStyle = isDarkMode ? "#FFF" : "#000";
+    ctx.fill();
+    
+    // House body
+    ctx.fillRect(
+      position.x - homeSize * 0.7, 
+      position.y - nodeRadius + 5, 
+      homeSize * 1.4, 
+      homeSize * 0.8
+    );
   }
 
   // Reset shadow

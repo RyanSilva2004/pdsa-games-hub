@@ -124,11 +124,64 @@ const minimax = (
   }
 };
 
+const checkWin = (board: string[][], player: string): boolean => {
+    // check rows and columns
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      if (board[i].every((cell) => cell === player)) return true;
+  
+      let columnWin = true;
+      for (let j = 0; j < BOARD_SIZE; j++) {
+        if (board[j][i] !== player) {
+          columnWin = false;
+          break;
+        }
+      }
+      if (columnWin) return true;
+    }
+  
+    // check main diagonal
+    let mainDiagonal = true;
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      if (board[i][i] !== player) {
+        mainDiagonal = false;
+        break;
+      }
+    }
+    if (mainDiagonal) return true;
+  
+    // check anti diagonal
+    let antiDiagonal = true;
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      if (board[i][BOARD_SIZE - 1 - i] !== player) {
+        antiDiagonal = false;
+        break;
+      }
+    }
+    if (antiDiagonal) return true;
+  
+    return false;
+  };
+  
+
 export const findBestMoveMinimax = (board: string[][]): [number, number] => {
   let bestScore = -Infinity;
   let bestMove: [number, number] = [-1, -1];
 
   const depthLimit = 3;
+
+  // try win for computer 1st
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    for (let j = 0; j < BOARD_SIZE; j++) {
+      if (!board[i][j]) {
+        board[i][j] = "O";
+        if (checkWin(board, "O")) {
+          board[i][j] = null;
+          return [i, j];
+        }
+        board[i][j] = null;
+      }
+    }
+  }
 
   for (let i = 0; i < BOARD_SIZE; i++) {
     for (let j = 0; j < BOARD_SIZE; j++) {

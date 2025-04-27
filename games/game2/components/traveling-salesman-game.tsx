@@ -1,21 +1,206 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CityMap } from "./city-map"
 import { useGameLogic } from "../logic/use-game-logic"
 import { GamePhase } from "../logic/types"
+import type { City } from "../logic/types"
+import { TSPResult } from "../logic/route-algorithms"
+import { TSPGameService } from "@/app/api/travelingSalesman/TSPGameService"
+
+// Initialize the game service
+const gameService = new TSPGameService();
+
+// Route Builder Component for users to enter their solution
+interface RouteBuilderProps {
+  homeCity: string | null
+  availableCities: City[]
+  selectedCities: City[]
+  onSubmit: (route: string[]) => void
+}
+
+function RouteBuilder({ homeCity, availableCities, selectedCities, onSubmit }: RouteBuilderProps) {
+  const [userRoute, setUserRoute] = useState<string[]>([])
+  const [remainingCities, setRemainingCities] = useState<City[]>([])
+  const [nextCity, setNextCity] = useState<string>("")
+  const [totalDistance, setTotalDistance] = useState<number>(0)
+  
+  // Set up initial state
+  useEffect(() => {
+    if (homeCity) {
+      // Start with home city
+      setUserRoute([homeCity])
+      // Initialize remaining cities (only those that must be visited)
+      setRemainingCities(selectedCities.filter(city => city.id !== homeCity))
+    }
+  }, [homeCity, selectedCities])
+
+  // Add a city to the route
+  const addCityToRoute = () => {
+    if (!nextCity) return
+
+    // Add to route
+    const newRoute = [...userRoute, nextCity]
+    setUserRoute(newRoute)
+    
+    // Remove from remaining cities
+    setRemainingCities(prevCities => prevCities.filter(city => city.id !== nextCity))
+    
+    // Reset selection
+    setNextCity("")
+  }
+
+  // Remove last city from route
+  const removeLastCity = () => {
+    if (userRoute.length <= 1) return // Don't remove home city
+    
+    const lastCity = userRoute[userRoute.length - 1]
+    const newRoute = userRoute.slice(0, -1)
+    setUserRoute(newRoute)
+    
+    // Add back to remaining cities if it was a mandatory city
+    const cityToAdd = selectedCities.find(city => city.id === lastCity)
+    if (cityToAdd && cityToAdd.id !== homeCity) {
+      setRemainingCities(prev => [...prev, cityToAdd])
+    }
+  }
+
+  // Complete the route by returning to home city
+  const completeRoute = () => {
+    if (userRoute.length <= 1 || !homeCity) return
+    if (userRoute[userRoute.length - 1] === homeCity) return // Already completed
+
+    // Complete the route by adding home city again
+    setUserRoute(prev => [...prev, homeCity])
+  }
+
+  // Determine if submit should be enabled
+  const isSubmitEnabled = () => {
+    // Route needs to start and end with home city
+    return (
+      userRoute.length > 0 &&
+      userRoute[0] === homeCity &&
+      userRoute[userRoute.length - 1] === homeCity &&
+      remainingCities.length === 0 // All required cities must be included
+    )
+  }
+
+  // Check if Return Home button should be active
+  const canReturnHome = () => {
+    return (
+      userRoute.length > 1 && 
+      remainingCities.length === 0 && // All required cities visited
+      userRoute[userRoute.length - 1] !== homeCity // Not already returned home
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-md">
+        <h4 className="font-medium text-purple-700 dark:text-purple-300 mb-2">Current Route</h4>
+        <div className="flex flex-wrap gap-1 mb-3">
+          {userRoute.map((cityId, index) => (
+            <div key={`${cityId}-${index}`} className="flex items-center">
+              <Badge className={cityId === homeCity ? "bg-yellow-500" : "bg-blue-600"}>
+                {cityId}
+              </Badge>
+              {index < userRoute.length - 1 && (
+                <span className="mx-1 text-gray-400">→</span>
+              )}
+            </div>
+          ))}
+          {userRoute.length === 0 && (
+            <span className="text-gray-500 dark:text-gray-400">No cities added yet</span>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <Select
+            value={nextCity}
+            onValueChange={setNextCity}
+            disabled={remainingCities.length === 0}
+          >
+            <SelectTrigger className="flex-grow">
+              <SelectValue placeholder="Select next city" />
+            </SelectTrigger>
+            <SelectContent>
+              {remainingCities.map((city) => (
+                <SelectItem key={city.id} value={city.id}>
+                  City {city.id}
+                </SelectItem>
+              ))}
+              {/* Include non-selected cities (for shortcuts) */}
+              {availableCities
+                .filter(city => 
+                  !userRoute.includes(city.id) && 
+                  !remainingCities.some(c => c.id === city.id) &&
+                  city.id !== homeCity
+                )
+                .map((city) => (
+                  <SelectItem key={city.id} value={city.id}>
+                    City {city.id} (optional)
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Button 
+            onClick={addCityToRoute} 
+            disabled={!nextCity}
+            variant="outline"
+            className="shrink-0"
+          >
+            Add
+          </Button>
+        </div>
+
+        <div className="flex justify-between gap-2">
+          <Button 
+            onClick={removeLastCity} 
+            variant="outline" 
+            disabled={userRoute.length <= 1}
+            className="flex-1"
+          >
+            Remove Last
+          </Button>
+          <Button 
+            onClick={completeRoute} 
+            variant={canReturnHome() ? "default" : "outline"}
+            disabled={!canReturnHome()}
+            className={`flex-1 ${canReturnHome() ? "bg-yellow-500 hover:bg-yellow-600" : ""}`}
+          >
+            Return Home
+          </Button>
+        </div>
+
+        <Button 
+          onClick={() => onSubmit(userRoute)} 
+          className="w-full bg-purple-600 hover:bg-purple-700 mt-2"
+          disabled={!isSubmitEnabled()}
+        >
+          Submit Solution
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export function TravelingSalesmanGame() {
   const [playerName, setPlayerName] = useState("")
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null)
   const [showOptimalRoute, setShowOptimalRoute] = useState(false)
   const [cityCount, setCityCount] = useState<number>(6) // Default to 6 cities
+  const [cityMapKey, setCityMapKey] = useState<number>(0) // Used to force remount only when needed
+  const [userSolution, setUserSolution] = useState<string[]>([])
+  const [solutionDistance, setSolutionDistance] = useState<number>(0)
 
   const {
     gamePhase,
@@ -34,6 +219,8 @@ export function TravelingSalesmanGame() {
     resetGame,
     calculateOptimalRoute,
     forceStartNewGame,
+    setGamePhase,
+    algorithmResults,
   } = useGameLogic()
 
   // Start the game after name entry
@@ -126,7 +313,14 @@ export function TravelingSalesmanGame() {
   // Start a new game
   const handleNewGame = () => {
     forceStartNewGame()
+    setCityMapKey(prev => prev + 1) // Force CityMap to remount on new game
     setShowOptimalRoute(false)
+    setUserSolution([])
+    setSolutionDistance(0)
+
+    // The key change: preserve player name but reset game state
+    setGamePhase(GamePhase.SETUP)
+    
     setMessage({
       type: "info",
       text: "Starting a new game. Please select the number of cities.",
@@ -137,6 +331,92 @@ export function TravelingSalesmanGame() {
       setMessage(null)
     }, 5000)
   }
+
+  // Handle user route submission
+  const handleRouteSubmit = async (route: string[]) => {
+    if (!adjacencyMatrix) return;
+
+    // Calculate the distance of user's route
+    const distance = adjacencyMatrix.calculateRouteDistance(route);
+    
+    setUserSolution(route);
+    setSolutionDistance(distance);
+    
+    try {
+      // Get the next game round number
+      const nextGameRound = await gameService.getLatestGameRound() + 1;
+      
+      // Calculate the optimal route for comparison
+      // Pass the gameRound parameter to save algorithm performance data
+      const optimal = await calculateOptimalRoute(nextGameRound);
+      
+      if (optimal) {
+        // Determine if user found the optimal solution
+        const isOptimal = distance === optimal.distance;
+        
+        // Calculate how close they were as a percentage
+        const percentageFromOptimal = ((distance - optimal.distance) / optimal.distance * 100).toFixed(1);
+        
+        // Set appropriate message based on result
+        if (isOptimal) {
+          setMessage({
+            type: "success",
+            text: `Congratulations! You found the optimal route with a total distance of ${distance} km!`,
+          });
+          
+          // Only save game result to Firebase if user found the optimal solution
+          const gameResult = {
+            playerName,
+            homeCity: gameState.homeCity || "",
+            selectedCities: selectedCities.map(city => city.id),
+            optimalRoute: optimal.route,
+            optimalDistance: optimal.distance,
+            correct: isOptimal,
+            playerDistance: distance,
+            gameRound: nextGameRound
+          };
+          
+          await gameService.saveGameResult(gameResult);
+          console.log("Game result saved successfully to Firebase!");
+        } else {
+          setMessage({
+            type: "info",
+            text: `Your route has a total distance of ${distance} km. The optimal route is ${optimal.distance} km (${percentageFromOptimal}% difference).`,
+          });
+          
+          // Show the optimal route immediately if the user's solution is wrong
+          setShowOptimalRoute(true);
+        }
+      } else {
+        setMessage({
+          type: "info",
+          text: `Your route has a total distance of ${distance} km.`,
+        });
+      }
+    } catch (error) {
+      console.error("Error saving game data:", error);
+    }
+    
+    // Move to completed phase using the correct function from useGameLogic
+    if (gamePhase === GamePhase.ROUTE_PLANNING) {
+      setGamePhase(GamePhase.COMPLETED);
+    }
+  };
+
+  // Helper function for rendering CityMap - used in multiple phases
+  const renderCityMap = () => (
+    <CityMap
+      key={cityMapKey} // Only changes when starting a new game
+      phase={gamePhase}
+      cities={availableCities}
+      adjacencyMatrix={adjacencyMatrix}
+      onMapReady={gamePhase === GamePhase.MAP_VISUALIZATION ? handleMapReady : undefined}
+      onCitySelect={gamePhase === GamePhase.CITY_SELECTION ? handleCitySelectionToggle : undefined}
+      currentRoute={userSolution.length > 0 ? userSolution : gameState.currentRoute}
+      highlightRoute={showOptimalRoute ? optimalRoute?.route : undefined}
+      homeCity={gameState.homeCity}
+    />
+  )
 
   return (
     <Card className="w-full max-w-6xl border-purple-200 dark:border-purple-900">
@@ -245,12 +525,7 @@ export function TravelingSalesmanGame() {
 
             <div className="flex flex-col md:flex-row gap-6">
               <div className="w-full md:w-3/4 h-[500px]">
-                <CityMap
-                  phase={gamePhase}
-                  cities={availableCities}
-                  adjacencyMatrix={adjacencyMatrix}
-                  onMapReady={handleMapReady}
-                />
+                {renderCityMap()}
               </div>
 
               <div className="w-full md:w-1/4 space-y-4">
@@ -318,12 +593,7 @@ export function TravelingSalesmanGame() {
 
             <div className="flex flex-col md:flex-row gap-6">
               <div className="w-full md:w-3/4 h-[500px]">
-                <CityMap
-                  phase={gamePhase}
-                  cities={availableCities}
-                  adjacencyMatrix={adjacencyMatrix}
-                  onCitySelect={handleCitySelectionToggle}
-                />
+                {renderCityMap()}
               </div>
 
               <div className="w-full md:w-1/4 space-y-4">
@@ -345,6 +615,9 @@ export function TravelingSalesmanGame() {
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Click on cities to select/deselect them. You need at least 3 cities.
                   </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    The home city ({gameState.homeCity}) is fixed and can't be selected.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -355,19 +628,242 @@ export function TravelingSalesmanGame() {
                   >
                     Confirm Selection
                   </Button>
-                  <Button onClick={handleNewGame} variant="outline" className="w-full">
-                    New Game
-                  </Button>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 text-center text-base text-purple-600/70 dark:text-purple-400/70">
-              Select the cities you want to include in your journey by clicking on them.
+              Select the cities you want to visit during your journey. The shortest path will be calculated using all available cities.
+            </div>
+          </div>
+        )}
+
+        {gamePhase === GamePhase.ROUTE_PLANNING && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-gray-700 dark:text-gray-200">Player:</span>
+                <Badge
+                  variant="outline"
+                  className="text-lg px-3 py-1 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30"
+                >
+                  {playerName}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-gray-700 dark:text-gray-200">Phase:</span>
+                <Badge
+                  variant="outline"
+                  className="text-lg px-3 py-1 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30"
+                >
+                  Route Planning
+                </Badge>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="w-full md:w-3/4 h-[500px]">
+                {renderCityMap()}
+              </div>
+
+              <div className="w-full md:w-1/4 space-y-4">
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Plan Your Route</h3>
+                  <div className="space-y-2">
+                    <div className="flex flex-col gap-2">
+                      <span className="text-gray-600 dark:text-gray-400">Home City:</span>
+                      <Badge className="bg-yellow-500 self-start">{gameState.homeCity}</Badge>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <span className="text-gray-600 dark:text-gray-400">Selected Cities:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedCities.map((city) => (
+                          <Badge key={city.id} className="bg-blue-600">
+                            {city.id}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+                    Find the shortest route that starts at the home city, visits all selected cities exactly once, and returns to the home city.
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Your Solution</h3>
+                  <div className="space-y-4">
+                    <RouteBuilder 
+                      homeCity={gameState.homeCity} 
+                      availableCities={availableCities} 
+                      selectedCities={selectedCities}
+                      onSubmit={handleRouteSubmit}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 text-center text-base text-purple-600/70 dark:text-purple-400/70">
+              Create your route by selecting cities in order. Remember you must start and end at the home city.
+            </div>
+          </div>
+        )}
+
+        {gamePhase === GamePhase.COMPLETED && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-gray-700 dark:text-gray-200">Player:</span>
+                <Badge
+                  variant="outline"
+                  className="text-lg px-3 py-1 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30"
+                >
+                  {playerName}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-gray-700 dark:text-gray-200">Phase:</span>
+                <Badge
+                  variant="outline"
+                  className="text-lg px-3 py-1 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/30"
+                >
+                  Completed
+                </Badge>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="w-full md:w-3/4 h-[500px]">
+                {renderCityMap()}
+              </div>
+
+              <div className="w-full md:w-1/4 space-y-4">
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Your Route</h3>
+                  <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-md mb-3">
+                    <div className="flex flex-wrap gap-1">
+                      {userSolution.map((cityId, index) => (
+                        <div key={`${cityId}-${index}`} className="flex items-center">
+                          <Badge className={cityId === gameState.homeCity ? "bg-yellow-500" : "bg-blue-600"}>
+                            {cityId}
+                          </Badge>
+                          {index < userSolution.length - 1 && (
+                            <span className="mx-1 text-gray-400">→</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 font-medium text-purple-700 dark:text-purple-300">
+                      Total Distance: {solutionDistance} KM
+                    </div>
+                  </div>
+                  {optimalRoute && (
+                    <>
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Optimal Route</h3>
+                      <div className="p-3 bg-green-50 dark:bg-green-900/30 rounded-md">
+                        <div className="flex flex-wrap gap-1">
+                          {optimalRoute.route.map((cityId, index) => (
+                            <div key={`opt-${cityId}-${index}`} className="flex items-center">
+                              <Badge className={cityId === gameState.homeCity ? "bg-yellow-500" : "bg-green-600"}>
+                                {cityId}
+                              </Badge>
+                              {index < optimalRoute.route.length - 1 && (
+                                <span className="mx-1 text-gray-400">→</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2 font-medium text-green-700 dark:text-green-300">
+                          Total Distance: {optimalRoute.distance} KM
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <Button
+                    onClick={handleNewGame}
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                  >
+                    Start New Game
+                  </Button>
+                  <Button
+                    onClick={() => setShowOptimalRoute(!showOptimalRoute)}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {showOptimalRoute ? "Hide Optimal Route" : "Show Optimal Route"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Add the Algorithm Performance Table */}
+            {algorithmResults.length > 0 && (
+              <div className="mt-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <AlgorithmPerformance results={algorithmResults} />
+              </div>
+            )}
+
+            <div className="mt-4 text-center text-base text-purple-600/70 dark:text-purple-400/70">
+              {solutionDistance === (optimalRoute?.distance || 0)
+                ? "Congratulations! You found the optimal route!"
+                : "You've completed the challenge. See how your route compares to the optimal solution."}
             </div>
           </div>
         )}
       </CardContent>
     </Card>
   )
+}
+
+// In the Completed phase, add a component to display algorithm performance metrics
+function AlgorithmPerformance({ results }: { results: TSPResult[] }) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Algorithm Performance</h3>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-800">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Algorithm</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Distance</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Time (ms)</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+            {results.map((result, index) => (
+              <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}>
+                <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{result.algorithmName}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {result.distance === Infinity ? '-' : `${result.distance} km`}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {result.executionTime === 0 ? '-' : 
+                   result.executionTime < 0.01 ? '< 0.01' : 
+                   result.executionTime.toFixed(2)}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm">
+                  {result.distance === Infinity ? (
+                    <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">Skipped</Badge>
+                  ) : result.route.length === 0 ? (
+                    <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">Failed</Badge>
+                  ) : result.distance === Math.min(...results.filter(r => r.distance !== Infinity).map(r => r.distance)) ? (
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Optimal</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Valid</Badge>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
