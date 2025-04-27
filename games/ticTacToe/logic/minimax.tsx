@@ -1,6 +1,6 @@
 import { BOARD_SIZE } from "@/games/ticTacToe/logic/gameLogic";
 
-const evaluateBoard = (board: string[][]): number => {
+const evaluateBoard = (board: (string | null)[][]): number => {
   const scoreLine = (line: string[]): number => {
     const countX = line.filter((cell) => cell === "X").length;
     const countO = line.filter((cell) => cell === "O").length;
@@ -21,14 +21,18 @@ const evaluateBoard = (board: string[][]): number => {
 
   // check rows
   for (let i = 0; i < BOARD_SIZE; i++) {
-    totalScore += scoreLine(board[i]);
+    totalScore += scoreLine(
+      board[i].filter((cell): cell is string => cell !== null)
+    );
 
     // check columns
     const column = [];
     for (let j = 0; j < BOARD_SIZE; j++) {
       column.push(board[j][i]);
     }
-    totalScore += scoreLine(column);
+    totalScore += scoreLine(
+      column.filter((cell): cell is string => cell !== null)
+    );
   }
 
   // check diagonals
@@ -38,13 +42,17 @@ const evaluateBoard = (board: string[][]): number => {
     mainDiagonal.push(board[i][i]);
     antiDiagonal.push(board[i][BOARD_SIZE - 1 - i]);
   }
-  totalScore += scoreLine(mainDiagonal);
-  totalScore += scoreLine(antiDiagonal);
+  totalScore += scoreLine(
+    mainDiagonal.filter((cell): cell is string => cell !== null)
+  );
+  totalScore += scoreLine(
+    antiDiagonal.filter((cell): cell is string => cell !== null)
+  );
 
   return totalScore;
 };
 
-const hasMovesLeft = (board: string[][]): boolean => {
+const hasMovesLeft = (board: (string | null)[][]): boolean => {
   for (let i = 0; i < BOARD_SIZE; i++) {
     for (let j = 0; j < BOARD_SIZE; j++) {
       if (!board[i][j]) return true;
@@ -55,7 +63,7 @@ const hasMovesLeft = (board: string[][]): boolean => {
 
 // minimax algorithm with alpha-beta pruning and depth limiting
 const minimax = (
-  board: string[][],
+  board: (string | null)[][],
   depth: number,
   isComputerTurn: boolean,
   alpha: number,
@@ -124,46 +132,47 @@ const minimax = (
   }
 };
 
-const checkWin = (board: string[][], player: string): boolean => {
-    // check rows and columns
-    for (let i = 0; i < BOARD_SIZE; i++) {
-      if (board[i].every((cell) => cell === player)) return true;
-  
-      let columnWin = true;
-      for (let j = 0; j < BOARD_SIZE; j++) {
-        if (board[j][i] !== player) {
-          columnWin = false;
-          break;
-        }
-      }
-      if (columnWin) return true;
-    }
-  
-    // check main diagonal
-    let mainDiagonal = true;
-    for (let i = 0; i < BOARD_SIZE; i++) {
-      if (board[i][i] !== player) {
-        mainDiagonal = false;
-        break;
-      }
-    }
-    if (mainDiagonal) return true;
-  
-    // check anti diagonal
-    let antiDiagonal = true;
-    for (let i = 0; i < BOARD_SIZE; i++) {
-      if (board[i][BOARD_SIZE - 1 - i] !== player) {
-        antiDiagonal = false;
-        break;
-      }
-    }
-    if (antiDiagonal) return true;
-  
-    return false;
-  };
-  
+const checkWin = (board: (string | null)[][], player: string): boolean => {
+  // check rows and columns
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    if (board[i].every((cell) => cell === player)) return true;
 
-export const findBestMoveMinimax = (board: string[][]): [number, number] => {
+    let columnWin = true;
+    for (let j = 0; j < BOARD_SIZE; j++) {
+      if (board[j][i] !== player) {
+        columnWin = false;
+        break;
+      }
+    }
+    if (columnWin) return true;
+  }
+
+  // check main diagonal
+  let mainDiagonal = true;
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    if (board[i][i] !== player) {
+      mainDiagonal = false;
+      break;
+    }
+  }
+  if (mainDiagonal) return true;
+
+  // check anti diagonal
+  let antiDiagonal = true;
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    if (board[i][BOARD_SIZE - 1 - i] !== player) {
+      antiDiagonal = false;
+      break;
+    }
+  }
+  if (antiDiagonal) return true;
+
+  return false;
+};
+
+export const findBestMoveMinimax = (
+  board: (string | null)[][]
+): [number, number] => {
   let bestScore = -Infinity;
   let bestMove: [number, number] = [-1, -1];
 
