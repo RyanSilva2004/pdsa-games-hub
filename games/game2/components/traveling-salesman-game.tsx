@@ -363,6 +363,21 @@ export function TravelingSalesmanGame() {
             type: "success",
             text: `Congratulations! You found the optimal route with a total distance of ${distance} km!`,
           });
+          
+          // Only save game result to Firebase if user found the optimal solution
+          const gameResult = {
+            playerName,
+            homeCity: gameState.homeCity || "",
+            selectedCities: selectedCities.map(city => city.id),
+            optimalRoute: optimal.route,
+            optimalDistance: optimal.distance,
+            correct: isOptimal,
+            playerDistance: distance,
+            gameRound: nextGameRound
+          };
+          
+          await gameService.saveGameResult(gameResult);
+          console.log("Game result saved successfully to Firebase!");
         } else {
           setMessage({
             type: "info",
@@ -372,21 +387,6 @@ export function TravelingSalesmanGame() {
           // Show the optimal route immediately if the user's solution is wrong
           setShowOptimalRoute(true);
         }
-        
-        // Save game result to Firebase
-        const gameResult = {
-          playerName,
-          homeCity: gameState.homeCity || "",
-          selectedCities: selectedCities.map(city => city.id),
-          optimalRoute: optimal.route,
-          optimalDistance: optimal.distance,
-          correct: isOptimal,
-          playerDistance: distance,
-          gameRound: nextGameRound
-        };
-        
-        await gameService.saveGameResult(gameResult);
-        console.log("Game result saved successfully to Firebase!");
       } else {
         setMessage({
           type: "info",

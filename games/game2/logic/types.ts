@@ -17,9 +17,9 @@ export interface GameState {
 }
 
 export enum GamePhase {
-  SETUP = "setup", // Ask for name and number of cities
-  MAP_VISUALIZATION = "map_visualization", // Show the map with all cities
-  CITY_SELECTION = "city_selection", // Select cities to visit
-  ROUTE_PLANNING = "route_planning", // Plan the route (future phase)
-  COMPLETED = "completed", // Route completed (future phase)
+  SETUP = "setup", 
+  MAP_VISUALIZATION = "map_visualization", 
+  CITY_SELECTION = "city_selection",
+  ROUTE_PLANNING = "route_planning", 
+  COMPLETED = "completed", 
 }

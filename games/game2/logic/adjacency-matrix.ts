@@ -3,20 +3,11 @@ export class AdjacencyMatrix
     private matrix: Record<string, Record<string, number>> = {}
     private cityIds: string[] = []
   
-    /**
-     * Create a new adjacency matrix for the given city IDs
-     * @param cityIds Array of city IDs (e.g., ["A", "B", "C"])
-     * @param randomize Whether to generate random distances (default: true)
-     */
-    
     constructor(cityIds: string[], randomize = true) {
       this.cityIds = [...cityIds]
       this.initialize(randomize)
     }
   
-    /**
-     * Initialize the matrix with zeros or random values
-     */
     private initialize(randomize: boolean): void {
       // Create empty matrix
       this.cityIds.forEach((cityId1) => {
@@ -25,17 +16,13 @@ export class AdjacencyMatrix
           this.matrix[cityId1][cityId2] = 0
         })
       })
-  
-      // Fill with random values if requested
+
       if (randomize) {
         this.randomize()
       }
     }
   
-    /**
-     * Fill the matrix with random distance values
-     * Ensures symmetry (distance A->B equals B->A)
-     */
+    // Generate random distances between cities
     public randomize(): void {
       for (let i = 0; i < this.cityIds.length; i++) {
         const cityId1 = this.cityIds[i]
@@ -56,41 +43,26 @@ export class AdjacencyMatrix
       }
     }
   
-    /**
-     * Get the distance between two cities
-     */
+
     public getDistance(fromCity: string, toCity: string): number {
       return this.matrix[fromCity][toCity]
     }
-  
-    /**
-     * Set the distance between two cities
-     * Also sets the reverse direction to maintain symmetry
-     */
+
+    // Set the distance between two cities & ensure symmetry
     public setDistance(fromCity: string, toCity: string, distance: number): void {
       this.matrix[fromCity][toCity] = distance
       this.matrix[toCity][fromCity] = distance
     }
   
-    /**
-     * Get all city IDs in the matrix
-     */
     public getCityIds(): string[] {
       return [...this.cityIds]
     }
-  
-    /**
-     * Get the raw matrix data
-     */
+
     public getMatrix(): Record<string, Record<string, number>> {
       return { ...this.matrix }
     }
   
-    /**
-     * Calculate the total distance of a route
-     * @param route Array of city IDs representing the route
-     * @returns Total distance or -1 if invalid route
-     */
+    
     public calculateRouteDistance(route: string[]): number {
       if (route.length <= 1) return 0
   
