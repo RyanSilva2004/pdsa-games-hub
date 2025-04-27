@@ -1,17 +1,12 @@
-// filepath: c:\Users\ryans\Desktop\Bsc Computing\PDSA-2\CW\pdsa-games-hub\games\game2\logic\route-algorithms.ts
-/**
- * Implementation of algorithms for solving the Traveling Salesman Problem
- */
+
 
 import { AdjacencyMatrix } from "./adjacency-matrix";
 import { TSPGameService } from "@/app/api/travelingSalesman/TSPGameService";
 
-// Initialize the game service for saving algorithm performance
+
 const gameService = new TSPGameService();
 
-/**
- * Interface for algorithm result including route, distance, and execution time
- */
+
 export interface TSPResult {
   route: string[];
   distance: number;
@@ -19,164 +14,94 @@ export interface TSPResult {
   algorithmName: string;
 }
 
-/**
- * Solves the Traveling Salesman Problem using the Nearest Neighbor algorithm
- * 
- * @param adjacencyMatrix - The adjacency matrix with distances between cities
- * @param startCity - The city to start from (and return to)
- * @param mandatoryCities - Cities that must be visited (in any order)
- * @returns Object containing the route, total distance, and execution time
- */
+
 export function nearestNeighborAlgorithm(
   adjacencyMatrix: AdjacencyMatrix,
   startCity: string,
   mandatoryCities: string[]
 ): TSPResult {
-  const startTime = performance.now();
+  const startTime = performance.now(); const allCities = adjacencyMatrix.getCityIds();
+  const route: string[] = [startCity]; let totalDistance = 0; let currentCity = startCity;
   
-  // Get all city IDs from the adjacency matrix
-  const allCities = adjacencyMatrix.getCityIds();
-  
-  // Initialize route with the start city
-  const route: string[] = [startCity];
-  let totalDistance = 0;
-  let currentCity = startCity;
-  
-  // Create a set of mandatory cities to track which ones we've visited
   const mandatoryToVisit = new Set(mandatoryCities.filter(city => city !== startCity));
+   const unvisited = new Set(allCities.filter(city => city !== startCity));
   
-  // Keep track of all unvisited cities
-  const unvisited = new Set(allCities.filter(city => city !== startCity));
-  
-  // Continue until we've visited all mandatory cities
   while (mandatoryToVisit.size > 0) {
     let nearestCity = "";
     let minDistance = Infinity;
     
-    // Find the nearest unvisited city
     for (const city of unvisited) {
       const distance = adjacencyMatrix.getDistance(currentCity, city);
       
-      // Prioritize mandatory cities first
       if (mandatoryToVisit.has(city)) {
         if (distance < minDistance) {
           minDistance = distance;
           nearestCity = city;
         }
       } else if (mandatoryToVisit.size === 0 && distance < minDistance) {
-        // Only consider non-mandatory cities if all mandatory ones are visited
         minDistance = distance;
         nearestCity = city;
       }
     }
     
-    // Add the nearest city to the route
     route.push(nearestCity);
     totalDistance += minDistance;
-    
-    // Update current city
     currentCity = nearestCity;
-    
-    // Remove the city from unvisited and mandatory sets
     unvisited.delete(nearestCity);
     mandatoryToVisit.delete(nearestCity);
   }
   
-  // Add the return to the start city
   totalDistance += adjacencyMatrix.getDistance(currentCity, startCity);
   route.push(startCity);
-  
   const endTime = performance.now();
-  // Ensure we have a valid, non-negative execution time
   const executionTime = Math.max(0.01, Math.abs(endTime - startTime));
   
-  return { 
-    route, 
-    distance: totalDistance, 
-    executionTime,
-    algorithmName: "Nearest Neighbor" 
-  };
+  return { route, distance: totalDistance,executionTime,algorithmName: "Nearest Neighbor" };
 }
 
-/**
- * Solves the Traveling Salesman Problem using an exhaustive search approach
- * 
- * @param adjacencyMatrix - The adjacency matrix with distances between cities
- * @param startCity - The city to start from (and return to)
- * @param mandatoryCities - Cities that must be visited (in any order)
- * @returns Object containing the route, total distance, and execution time
- */
+
 export function bruteForceAlgorithm(
   adjacencyMatrix: AdjacencyMatrix,
   startCity: string,
   mandatoryCities: string[]
 ): TSPResult {
   const startTime = performance.now();
-  
-  // For the brute force, we only consider mandatory cities
-  // Filter out the start city from mandatory cities list
   const citiesToPermute = mandatoryCities.filter(city => city !== startCity);
-  
-  // Generate all permutations of cities to visit
   const permutations = generatePermutations(citiesToPermute);
   
   let bestRoute: string[] = [];
   let bestDistance = Infinity;
   
-  // Check each permutation
   for (const permutation of permutations) {
-    // Add start city at beginning and end
     const route = [startCity, ...permutation, startCity];
-    
-    // Calculate total distance
     let distance = 0;
     for (let i = 0; i < route.length - 1; i++) {
       distance += adjacencyMatrix.getDistance(route[i], route[i + 1]);
     }
-    
-    // Update best route if this one is better
     if (distance < bestDistance) {
       bestDistance = distance;
       bestRoute = [...route];
     }
   }
-  
+
   const endTime = performance.now();
-  // Ensure we have at least a small positive number for execution time
   const executionTime = Math.max(0.01, endTime - startTime);
   
-  return { 
-    route: bestRoute, 
-    distance: bestDistance, 
-    executionTime,
-    algorithmName: "Brute Force" 
-  };
+  return { route: bestRoute, distance: bestDistance, executionTime,algorithmName: "Brute Force" };
 }
 
-/**
- * Generate all permutations of a given array
- * (Helper function for brute force algorithm)
- */
+/// Generate all permutations for brute force algorithm
 function generatePermutations<T>(elements: T[]): T[][] {
   // Base case: 1 or 0 elements
   if (elements.length <= 1) {
     return [elements];
   }
-  
   const result: T[][] = [];
   
-  // Try each element as first element
   for (let i = 0; i < elements.length; i++) {
-    // Get current element
     const current = elements[i];
-    
-    // Get remaining elements
     const remaining = elements.slice(0, i).concat(elements.slice(i + 1));
-    
-    // Generate all permutations of remaining elements
     const remainingPermutations = generatePermutations(remaining);
-    
-    // Add current element to the beginning of each permutation of remaining elements
     for (const permutation of remainingPermutations) {
       result.push([current, ...permutation]);
     }
@@ -185,41 +110,22 @@ function generatePermutations<T>(elements: T[]): T[][] {
   return result;
 }
 
-/**
- * Branch and Bound algorithm for TSP - a recursive approach that prunes the search tree
- * 
- * @param adjacencyMatrix - The adjacency matrix with distances between cities
- * @param startCity - The city to start from (and return to)
- * @param mandatoryCities - Cities that must be visited (in any order)
- * @returns Object containing the route, total distance, and execution time
- */
+
 export function branchAndBoundAlgorithm(
   adjacencyMatrix: AdjacencyMatrix,
   startCity: string,
   mandatoryCities: string[]
 ): TSPResult {
   const startTime = performance.now();
-  
-  // Filter out the start city from mandatory cities
   const citiesToVisit = mandatoryCities.filter(city => city !== startCity);
-  
-  // Initialize global best route and distance
   let globalBestRoute: string[] = [];
   let globalBestDistance = Infinity;
-  
-  // Initialize visited cities array and current path
   const visited = new Set<string>([startCity]);
   const currentPath = [startCity];
   let currentDistance = 0;
   
-  // Call recursive helper function
-  branchAndBoundHelper(
-    adjacencyMatrix,
-    startCity,
-    currentPath,
-    currentDistance,
-    visited,
-    citiesToVisit,
+
+  branchAndBoundHelper( adjacencyMatrix,startCity,currentPath,currentDistance,visited,citiesToVisit,
     (route, distance) => {
       if (distance < globalBestDistance) {
         globalBestDistance = distance;
@@ -229,22 +135,15 @@ export function branchAndBoundAlgorithm(
   );
   
   const endTime = performance.now();
-  // Ensure we have at least a small positive number for execution time
   const executionTime = Math.max(0.01, endTime - startTime);
   
-  return {
-    route: globalBestRoute,
-    distance: globalBestDistance,
-    executionTime,
-    algorithmName: "Branch and Bound"
-  };
+  return {route: globalBestRoute, distance: globalBestDistance,executionTime,algorithmName: "Branch and Bound"};
 }
 
-/**
- * Recursive helper function for Branch and Bound algorithm
- */
+
+/// Recursive helper function for branch and bound algorithm
 function branchAndBoundHelper(
-  adjacencyMatrix: AdjacencyMatrix,
+ adjacencyMatrix: AdjacencyMatrix,
   startCity: string,
   currentPath: string[],
   currentDistance: number,
@@ -252,24 +151,17 @@ function branchAndBoundHelper(
   mandatoryCities: string[],
   updateBest: (route: string[], distance: number) => void
 ): void {
-  // Check if we've visited all mandatory cities
   const allVisited = mandatoryCities.every(city => visited.has(city));
   
   if (allVisited) {
-    // Return to start city to complete the tour
     const lastCity = currentPath[currentPath.length - 1];
     const returnDistance = adjacencyMatrix.getDistance(lastCity, startCity);
     const totalDistance = currentDistance + returnDistance;
-    
-    // Update best solution if this one is better
     updateBest([...currentPath, startCity], totalDistance);
     return;
   }
   
-  // Get the last city in our current path
   const lastCity = currentPath[currentPath.length - 1];
-  
-  // Try each unvisited mandatory city as the next step
   for (const nextCity of mandatoryCities) {
     if (!visited.has(nextCity)) {
       // Calculate distance to this city
@@ -282,19 +174,10 @@ function branchAndBoundHelper(
         continue;
       }
       
-      // Add city to path and mark as visited
       visited.add(nextCity);
       currentPath.push(nextCity);
-      
-      // Recursively explore this path
-      branchAndBoundHelper(
-        adjacencyMatrix,
-        startCity,
-        currentPath,
-        newDistance,
-        visited,
-        mandatoryCities,
-        updateBest
+
+      branchAndBoundHelper(adjacencyMatrix,startCity,currentPath,newDistance, visited,mandatoryCities,updateBest
       );
       
       // Backtrack: remove city from path and mark as unvisited
