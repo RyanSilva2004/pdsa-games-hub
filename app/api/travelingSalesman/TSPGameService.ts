@@ -12,9 +12,6 @@ import {
 } from "firebase/firestore";
 import { TSPResult } from "@/games/game2/logic/route-algorithms";
 
-/**
- * Interface for algorithm performance data to be stored in Firebase
- */
 export interface AlgorithmPerformanceRecord {
   algorithmName: string;
   executionTime: number;
@@ -23,9 +20,7 @@ export interface AlgorithmPerformanceRecord {
   gameRound: number;
 }
 
-/**
- * Interface for grouped algorithm performance data
- */
+
 export interface GroupedAlgorithmPerformance {
   algorithms: {
     name: string;
@@ -36,31 +31,22 @@ export interface GroupedAlgorithmPerformance {
   timestamp: any;
 }
 
-/**
- * Interface for TSP game data to be stored in Firebase
- */
+
 export interface TSPGameRecord {
   playerName: string;
   homeCity: string;
   selectedCities: string[];
   optimalRoute: string[];
   optimalDistance: number;
-  timestamp: any; // Firestore timestamp
-  correct: boolean; // Whether player found the optimal solution
+  timestamp: any; 
+  correct: boolean; 
   playerDistance: number;
-  gameRound: number; // To track game rounds for the player
+  gameRound: number; 
 }
 
-/**
- * Service class for interacting with Firebase for the Traveling Salesman Game
- */
+
 export class TSPGameService {
-  /**
-   * Save a completed game to Firestore
-   * 
-   * @param gameData The game data to save
-   * @returns Promise resolving to the document ID
-   */
+
   async saveGameResult(gameData: Omit<TSPGameRecord, "timestamp">): Promise<string> {
     try {
       const docRef = await addDoc(collection(firestore, "tspGameResults"), {
@@ -74,13 +60,7 @@ export class TSPGameService {
     }
   }
 
-  /**
-   * Save algorithm performance results to Firestore
-   * 
-   * @param results Array of algorithm results
-   * @param gameRound The game round number
-   * @returns Promise resolving to the document ID
-   */
+
   async saveAlgorithmPerformance(
     results: TSPResult[],
     gameRound: number
@@ -110,11 +90,6 @@ export class TSPGameService {
     }
   }
 
-  /**
-   * Get algorithm performance data for the last 10 game rounds
-   * 
-   * @returns Promise resolving to algorithm performance records
-   */
   async getAlgorithmPerformanceData(): Promise<AlgorithmPerformanceRecord[]> {
     try {
       const q = query(
@@ -137,11 +112,6 @@ export class TSPGameService {
     }
   }
 
-  /**
-   * Get the latest game round number
-   * 
-   * @returns Promise resolving to the latest game round number
-   */
   async getLatestGameRound(): Promise<number> {
     try {
       const q = query(
