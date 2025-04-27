@@ -1,5 +1,6 @@
 const findAllNQueensSolutionsWithTime = (n: number) => {
   const results: number[][] = [];
+  console.log("called backtrack");
 
   const isSafe = (board: number[], row: number, col: number) => {
     for (let i = 0; i < row; i++) {
