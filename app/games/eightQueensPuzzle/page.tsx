@@ -29,7 +29,7 @@ import { headers } from "next/headers";
 
 type errorType = {
   header: string;
-  description: string | unknown;
+  description: any;
 };
 
 type ScoreEntry = {
@@ -55,7 +55,7 @@ export const checkAndResetScoreboard = async (
 ) => {
   const allSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
 
-  const validSolutions = (allSolutions?.solution || []).map((str) =>
+  const validSolutions = (allSolutions?.solution || []).map((str: any) =>
     str.split(",").slice(0, -1).join(",")
   );
 
@@ -84,6 +84,119 @@ export const checkAndResetScoreboard = async (
   return false;
 };
 
+export const handleGamePlay = async (
+  finalMoves: string[],
+  solutionType: SolutionRecognition,
+  gameStatus: gameStatusType,
+  playerName: string,
+  elapsedTime: number
+) => {
+  try {
+    const userId = await saveGamePlay(
+      playerName,
+      finalMoves,
+      solutionTypes.GAME_PLAY,
+      elapsedTime,
+      gameStatus,
+      userType.GUEST_USER,
+      solutionType
+    );
+  } catch (e) {
+    throw { header: "Error in save Game", description: e };
+  } finally {
+  }
+};
+
+export const fetchScores = async () => {
+  try {
+    const allScores = await getAllWinningMoves();
+
+    const sortedTopWinners = allScores
+      .filter((score) => score.status === "win")
+      .sort((a, b) => a.time - b.time);
+    console.log("sortedTopWinners  : ", sortedTopWinners);
+    return sortedTopWinners;
+  } catch (e) {
+    throw { header: "Error in Fetching Score Board", description: e };
+  }
+};
+
+export const gameOver = async (
+  queenCount: number,
+  playerName: string,
+  elapsedTime: number,
+  setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>,
+  setGameMessage: React.Dispatch<React.SetStateAction<string>>,
+  setIsGameEndingLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  setError: React.Dispatch<React.SetStateAction<errorType | null>>,
+  filteredMovesOfUser: () => string[],
+  isSolutionValidate: () => Promise<boolean | null>,
+  handleGamePlay: (
+    moves: string[],
+    solutionRecognition: SolutionRecognition,
+    gameStatus: gameStatusType,
+    playerName: string,
+    elapsedTime: number
+  ) => Promise<void>,
+  countEmptySlots: () => number,
+  timerInterval: NodeJS.Timeout | null | undefined
+) => {
+  setIsGameEndingLoading(true);
+  const finalMoves = filteredMovesOfUser();
+
+  if (queenCount + 1 === BOARD_SIZE) {
+    const isKnownSolution = await isSolutionValidate();
+
+    setIsModalOpen(true);
+    if (isKnownSolution == null) {
+      setGameMessage(
+        "You have successfully solved the puzzle. However, an issue occurred during the game-winning validation. Please reload the page to see your name appear on the leaderboard."
+      );
+    } else {
+      setGameMessage(
+        isKnownSolution ? "This solution already exists!" : "You won!"
+      );
+    }
+
+    try {
+      await handleGamePlay(
+        finalMoves,
+        isKnownSolution
+          ? SolutionRecognition.Known
+          : SolutionRecognition.Unique,
+        gameStatusType.WIN,
+        playerName,
+        elapsedTime
+      );
+    } catch (e) {
+      setError({ header: "Error in save Game", description: e });
+    }
+  } else {
+    try {
+      await handleGamePlay(
+        finalMoves,
+        SolutionRecognition.Variation,
+        gameStatusType.LOST,
+        playerName,
+        elapsedTime
+      );
+    } catch (e) {
+      setError({ header: "Error in save Game", description: e });
+    }
+
+    setIsModalOpen(true);
+    const emptySlots = countEmptySlots();
+
+    if (emptySlots === 1) {
+      setGameMessage("Game over! So close! Only one move left.");
+    } else if (emptySlots > 0) {
+      setGameMessage("Game over! You are out of moves.");
+    }
+  }
+  setIsGameEndingLoading(false);
+  if (timerInterval) clearInterval(timerInterval);
+};
+
 const EightQueensPuzzle = () => {
   const [playerName, setPlayerName] = useState<string>("");
   const [board, setBoard] = useState<number[][]>(
@@ -104,12 +217,11 @@ const EightQueensPuzzle = () => {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [highestScores, setHighestScores] = useState<ScoreEntry[]>([]);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
-  const [error, setError] = useState<errorType | null>();
-
+  const [error, setError] = useState<errorType | null>(null);
   const [sequentialTime, setSequentialTime] = useState<number | null>(null);
   const [threadedTime, setThreadedTime] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isScoreBoardLoading, setIsScoreBoardloading] = useState(false);
+  const [isScoreBoardLoading, setIsScoreBoardloading] = useState(true);
   const [isGameEndingLoading, setIsGameEndingLoading] = useState(false);
   const [allBacktrackSolutions, setAllBacktrackSolutions] = useState<
     string[] | undefined
@@ -122,39 +234,15 @@ const EightQueensPuzzle = () => {
   const [hintCount, setHintCount] = useState(2);
   const [hintVislbe, setHintVislbe] = useState(true);
 
-  const handleUser = async () => {
-    try {
-      let userId;
-
-      // if (userData.userType === 'registered') {
-      //   userId = await createUser(userData);
-      // } else if (userData.userType === 'guest') {
-      userId = await createGuestUser();
-      // } else {
-      //   throw new Error('Invalid userType provided.');
-      // }
-    } catch (e) {}
-  };
-
   useEffect(() => {
     setIsNameModalOpen(true);
   }, []);
 
-  useEffect(() => {
-    // handleUser();
-  }, []);
-
-  const fetchScores = async () => {
-    setIsScoreBoardloading(true);
+  const fetchingScore = async () => {
     try {
-      const allScores = await getAllWinningMoves();
-
-      const sortedTopWinners = allScores
-        .filter((score) => score.status === "win")
-        .sort((a, b) => a.time - b.time)
-        .slice(0, 10);
-
-      setHighestScores(sortedTopWinners);
+      setIsScoreBoardloading(true);
+      const scoreDataSet = await fetchScores();
+      setHighestScores(scoreDataSet);
     } catch (e) {
       setError({ header: "Error in Fetching Score Board", description: e });
     } finally {
@@ -163,7 +251,7 @@ const EightQueensPuzzle = () => {
   };
 
   useEffect(() => {
-    fetchScores();
+    fetchingScore();
   }, [isGameEndingLoading]);
 
   const resertScoreCaller = async () => {
@@ -197,7 +285,20 @@ const EightQueensPuzzle = () => {
     setQueenCount(queenCount + 1);
 
     if (queenCount === MOVES_LIMIT || emptySlotCount === 0) {
-      gameOver(queenCount, emptySlotCount);
+      gameOver(
+        queenCount,
+        playerName,
+        elapsedTime,
+        setIsModalOpen,
+        setGameMessage,
+        setIsGameEndingLoading,
+        setError,
+        filteredMovesOfUser,
+        isSolutionValidate,
+        handleGamePlay,
+        countEmptySlots,
+        timerInterval
+      );
     }
   };
 
@@ -264,71 +365,6 @@ const EightQueensPuzzle = () => {
     } else {
       return null;
     }
-  };
-
-  const handleGamePlay = async (
-    finalMoves: string[],
-    solutionType: SolutionRecognition,
-    gameStatus: gameStatusType
-  ) => {
-    try {
-      const userId = await saveGamePlay(
-        playerName,
-        finalMoves,
-        solutionTypes.GAME_PLAY,
-        elapsedTime,
-        gameStatus,
-        userType.GUEST_USER,
-        solutionType
-      );
-    } catch (e) {
-      setError({ header: "Error in save Game", description: e });
-    } finally {
-    }
-  };
-
-  const gameOver = async (moves: number, emptySlotsCount: number) => {
-    setIsGameEndingLoading(true);
-    const finalMoves = filteredMovesOfUser();
-
-    if (queenCount + 1 === BOARD_SIZE) {
-      const isKnownSolution = await isSolutionValidate();
-
-      setIsModalOpen(true);
-      if (isKnownSolution == null) {
-        setGameMessage(
-          "You have successfully solved the puzzle. However, an issue occurred during the game-winning validation. Please reload the page to see your name appear on the leaderboard."
-        );
-      } else {
-        setGameMessage(
-          isKnownSolution ? "This solution already exists!" : "You won!"
-        );
-      }
-
-      await handleGamePlay(
-        finalMoves,
-        isKnownSolution
-          ? SolutionRecognition.Known
-          : SolutionRecognition.Unique,
-        gameStatusType.WIN
-      );
-    } else {
-      await handleGamePlay(
-        finalMoves,
-        SolutionRecognition.Variation,
-        gameStatusType.LOST
-      );
-      setIsModalOpen(true);
-      const emptySlots = countEmptySlots();
-
-      if (emptySlots === 1) {
-        setGameMessage("Game over! So close! Only one move left.");
-      } else if (emptySlots > 0) {
-        setGameMessage("Game over! You are out of moves.");
-      }
-    }
-    setIsGameEndingLoading(false);
-    if (timerInterval) clearInterval(timerInterval);
   };
 
   const handleRestart = () => {
@@ -692,7 +728,7 @@ const EightQueensPuzzle = () => {
             )}
           </div>
         )}
-        <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-64 ms-5 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
+        <div className="flex flex-col items-center p-4 border border-gray-600 rounded-lg shadow-lg w-80 ms-5 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-200">Game Scoreboard</h2>
           </div>
@@ -741,26 +777,26 @@ const EightQueensPuzzle = () => {
                   Top Scores
                 </h3>
                 {highestScores && highestScores.length > 0 ? (
-                  <div className="space-y-2">
-                    {highestScores
-                      .slice(0, 10)
-                      .map((score: ScoreEntry, index: number) => (
-                        <div
-                          key={index}
-                          className="flex justify-between text-sm text-gray-300"
-                        >
-                          <span className="w-1/3 truncate">{score.name}</span>
-                          <span className="w-1/3 text-center">
-                            {score.time}s
-                          </span>
-                          <span className="w-1/3 text-right">{score.date}</span>
-                        </div>
-                      ))}
+                  <div className="space-y-2 max-h-[400px] overflow-auto">
+                    {highestScores.map((score: ScoreEntry, index: number) => (
+                      <div
+                        key={index}
+                        className="flex justify-between text-sm text-gray-300"
+                      >
+                        <span className="w-1/3 truncate">{score.name}</span>
+                        <span className="w-1/3 text-center">{score.time}s</span>
+                        <span className="w-1/3 text-right">{score.date}</span>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-400 italic">
-                    No scores recorded yet
-                  </div>
+                  !isScoreBoardLoading &&
+                  highestScores &&
+                  !highestScores.length && (
+                    <div className="text-sm text-gray-400 italic">
+                      No scores recorded yet
+                    </div>
+                  )
                 )}
               </>
             )}
@@ -790,7 +826,7 @@ const EightQueensPuzzle = () => {
               onClick={() => setIsNameModalOpen(false)}
               disabled={playerName.trim() === ""}
             >
-              Start
+              Save
             </button>
           </div>
         </div>
