@@ -139,25 +139,60 @@ export function CityMap({
             if (y > maxY) maxY = y
           })
           
-          // Scale and center to fit canvas
-          const padding = 60
-          const plotW = canvas.width - 2 * padding
-          const plotH = canvas.height - 2 * padding
-          const scaleX = plotW / (maxX - minX || 1)
-          const scaleY = plotH / (maxY - minY || 1)
-          const scale = Math.min(scaleX, scaleY)
+          // Scale and center to fit canvas with safe padding
+          const totalCities = cities.length;
+          // Ensure we have enough padding to keep cities inside the canvas
+          const minPadding = 30; // Increased minimum padding to keep cities fully visible
+          // Use less horizontal padding to maximize width usage
+          const paddingY = Math.max(minPadding, 40 - (totalCities - 5) * 3);
+          const paddingX = Math.max(minPadding - 15, 25 - (totalCities - 5) * 3);
+          
+          const plotW = canvas.width - 2 * paddingX;
+          const plotH = canvas.height - 2 * paddingY;
+          
+          // Get aspect ratio of data and canvas
+          const dataAspect = (maxX - minX) / (maxY - minY || 1);
+          const canvasAspect = plotW / plotH;
+          
+          // Adjust scaling to prioritize width while keeping points in bounds
+          let scaleX, scaleY;
+          
+          // If data is wider than canvas proportionally
+          if (dataAspect > canvasAspect) {
+            // Scale to width
+            scaleX = plotW / (maxX - minX || 1);
+            scaleY = scaleX * 0.9; // Slightly compress vertically to use more horizontal space
+          } else {
+            // Data is taller than canvas, but we want to prioritize width usage
+            // Use a modified approach to stretch horizontally within constraints
+            scaleY = plotH / (maxY - minY || 1);
+            
+            // Calculate how much we can stretch horizontally while staying in bounds
+            // Use a more aggressive horizontal stretch factor
+            const widthUtilizationFactor = Math.min(1.8, 1.2 + (canvasAspect / dataAspect - 1) * 0.9);
+            scaleX = scaleY * widthUtilizationFactor;
+          }
+          
+          // Safety scaling factor to ensure nothing exceeds boundaries
+          // Use different safety factors for X and Y to maximize width
+          const safetyFactorY = 0.95;
+          const safetyFactorX = 0.98; // Allow X to get closer to edges
+          scaleX *= safetyFactorX;
+          scaleY *= safetyFactorY;
           
           // Create positions object
           const newPositions: Record<string, { x: number; y: number }> = {}
           mdsCoords.forEach((coord, i) => {
             newPositions[cityIds[i]] = {
-              x: padding + (coord.x - minX) * scale,
-              y: padding + (coord.y - minY) * scale,
+              x: paddingX + (coord.x - minX) * scaleX,
+              y: paddingY + (coord.y - minY) * scaleY,
             }
           })
           
           // Ensure cities aren't too close to each other
-          ensureCitySeparation(newPositions, 80) // Minimum 80px between cities
+          // Use a dynamic minimum distance based on the number of cities
+          const minDistance = Math.max(40, 80 - (totalCities - 5) * 6);
+          ensureCitySeparation(newPositions, minDistance)
           
           // Update local positions state
           setCityPositions(newPositions)
@@ -181,26 +216,59 @@ export function CityMap({
           fallbackPositioning()
         }
       } else {
-        // Fallback to simple circular layout
+        // Fallback to simple elliptical layout
         fallbackPositioning()
       }
     }
     
-    // Fallback positioning function (circular layout)
+    // Fallback positioning function (elliptical layout)
     function fallbackPositioning() {
-      // Calculate positions in a circle
+      // Calculate positions in an elliptical layout
       const newPositions: Record<string, { x: number; y: number }> = {}
+      
+      // Ensure canvas exists
+      if (!canvas) return;
+      
       const centerX = canvas.width / 2
       const centerY = canvas.height / 2
-      const radius = Math.min(canvas.width, canvas.height) * 0.4 - 30
       
+      // Calculate aspect ratio and pick appropriate radii for elliptical layout
+      const aspectRatio = canvas.width / canvas.height;
+      
+      // Use elliptical layout to maximize width usage
+      // Make x-radius significantly larger than y-radius to stretch horizontally
+      const radiusX = canvas.width * 0.47 - 20;  // More aggressive width usage (47% of width)
+      const radiusY = canvas.height * 0.43 - 20; // Slightly smaller height (43% of height)
+      
+      // Distribute cities in an ellipse to better utilize width
       cities.forEach((city, i) => {
         const angle = (i / cities.length) * 2 * Math.PI
         newPositions[city.id] = {
-          x: centerX + radius * Math.cos(angle),
-          y: centerY + radius * Math.sin(angle),
+          x: centerX + radiusX * Math.cos(angle),
+          y: centerY + radiusY * Math.sin(angle),
         }
       })
+      
+      // Calculate the node radius based on number of cities
+      const totalCities = cities.length;
+      const nodeRadius = Math.max(15, 25 - Math.floor((totalCities - 5) / 2) * 3);
+      
+      // Ensure cities stay within canvas boundaries
+      Object.values(newPositions).forEach(pos => {
+        const safeMargin = nodeRadius + 10;
+        
+        // Adjust x-position if too close to edge
+        if (pos.x < safeMargin) pos.x = safeMargin;
+        if (pos.x > canvas.width - safeMargin) pos.x = canvas.width - safeMargin;
+        
+        // Adjust y-position if too close to edge
+        if (pos.y < safeMargin) pos.y = safeMargin;
+        if (pos.y > canvas.height - safeMargin) pos.y = canvas.height - safeMargin;
+      });
+      
+      // Ensure minimum separation
+      const minDistance = Math.max(40, 70 - (totalCities - 5) * 5);
+      ensureCitySeparation(newPositions, minDistance)
       
       // Update local positions state
       setCityPositions(newPositions)
@@ -212,6 +280,9 @@ export function CityMap({
       setPositionsGenerated(true)
       
       // Draw the map with the new positions
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return;
+      
       redrawMap(
         ctx,
         canvas.width,
@@ -575,7 +646,7 @@ function drawConnection(
     return
   }
   drawnEdges.add(edgeKey)
-
+  
   // Get a neon color for this edge
   const colorIndex = (city1Id.charCodeAt(0) + city2Id.charCodeAt(0)) % neonColors.length
   const edgeColor = neonColors[colorIndex]
@@ -586,11 +657,17 @@ function drawConnection(
   // Safely calculate distance2D with fallback
   const distance2D = Math.sqrt(dx * dx + dy * dy) || 0.001
 
+  // Determine if we should draw a detailed connection based on number of cities
+  const totalCities = Object.keys(globalCityPositions).length;
+  const isDetailedConnection = totalCities <= 7; // Only draw detailed connections for 7 or fewer cities
+  
   // Vary curve based on edge index for better distribution
   const curveDirection = index % 2 === 0 ? 1 : -1
   
-  // Safer curve magnitude calculation with bounds
-  const curveMagnitude = Math.min(0.2 + (index % 3) * 0.1, 0.4) // Vary between 0.2, 0.3, and 0.4, max 0.4
+  // Adjust curve magnitude based on number of cities
+  // For many cities, use smaller curves to avoid overlaps
+  const curveFactor = Math.max(0.1, 0.4 - (totalCities - 5) * 0.05);
+  const curveMagnitude = Math.min(curveFactor + (index % 3) * 0.05, 0.3);
   
   // Safely calculate perpendicular components
   const perpX = distance2D !== 0 ? -dy / distance2D : 0
@@ -601,7 +678,7 @@ function drawConnection(
   const midY = (pos1.y + pos2.y) / 2
   
   // Limit the curve control point displacement to avoid extreme values
-  const maxCurveDisplacement = Math.min(distance2D * 0.5, 100)
+  const maxCurveDisplacement = Math.min(distance2D * 0.3, 80)
   const controlX = midX + curveDirection * perpX * Math.min(distance2D * curveMagnitude, maxCurveDisplacement)
   const controlY = midY + curveDirection * perpY * Math.min(distance2D * curveMagnitude, maxCurveDisplacement)
 
@@ -615,10 +692,10 @@ function drawConnection(
     ctx.shadowColor = edgeColor
     ctx.shadowBlur = 10
     ctx.strokeStyle = edgeColor
-    ctx.lineWidth = 2.5 // Slightly thicker line in dark mode
+    ctx.lineWidth = 2 // Slimmer line in dark mode for many cities
   } else {
     ctx.strokeStyle = edgeColor
-    ctx.lineWidth = 3 // Thicker line for better visibility
+    ctx.lineWidth = Math.max(1.5, 3 - (totalCities - 5) * 0.3) // Thinner lines for many cities
   }
 
   ctx.stroke()
@@ -626,10 +703,86 @@ function drawConnection(
   // Reset shadow
   ctx.shadowColor = "transparent"
   ctx.shadowBlur = 0
+  
+  // Skip detailed flag drawing for many cities to reduce clutter
+  if (!isDetailedConnection) {
+    // For many cities, just draw a small text label near the middle of the path
+    // Choose a position that varies based on the edge index to avoid overlaps
+    const tOffset = 0.05 + (index % 5) * 0.02; // Small variation in position (0.05 to 0.15)
+    const t = 0.5 + (index % 2 === 0 ? tOffset : -tOffset); // Vary between 0.35-0.65
+    
+    const labelX = (1 - t) * (1 - t) * pos1.x + 2 * (1 - t) * t * controlX + t * t * pos2.x
+    const labelY = (1 - t) * (1 - t) * pos1.y + 2 * (1 - t) * t * controlY + t * t * pos2.y
+    
+    // Calculate distances to cities to avoid overlapping
+    const dist1 = Math.sqrt((labelX - pos1.x) ** 2 + (labelY - pos1.y) ** 2);
+    const dist2 = Math.sqrt((labelX - pos2.x) ** 2 + (labelY - pos2.y) ** 2);
+    
+    // Detect if we're too close to a city node - use a larger safety margin
+    const nodeRadius = Math.max(15, 25 - Math.floor((totalCities - 5) / 2) * 3);
+    // Increase safe distance to ensure labels are further from cities
+    const safeDistance = nodeRadius * 2.5;
+    
+    let finalX = labelX;
+    let finalY = labelY;
+    
+    if (dist1 < safeDistance || dist2 < safeDistance) {
+      // If too close, push label further away from both cities
+      // Calculate which city we're closest to
+      const closestCity = dist1 < dist2 ? 1 : 2;
+      const cityPos = closestCity === 1 ? pos1 : pos2;
+      
+      // Direction vector from city to label
+      const dirX = labelX - cityPos.x;
+      const dirY = labelY - cityPos.y;
+      const dirLength = Math.sqrt(dirX * dirX + dirY * dirY) || 0.001;
+      
+      // Normalized direction vector
+      const normDirX = dirX / dirLength;
+      const normDirY = dirY / dirLength;
+      
+      // Push label outward along this direction vector
+      const pushDistance = safeDistance * 1.1 - (closestCity === 1 ? dist1 : dist2);
+      finalX = labelX + normDirX * pushDistance;
+      finalY = labelY + normDirY * pushDistance;
+      
+      // Also add some perpendicular displacement to avoid label-to-label overlap
+      const perpOffsetMultiplier = (index % 2 === 0 ? 1 : -1) * (1 + (index % 3) * 0.3);
+      finalX += perpX * nodeRadius * perpOffsetMultiplier * 0.7;
+      finalY += perpY * nodeRadius * perpOffsetMultiplier * 0.7;
+    }
+    
+    // Always include "KM" in the label
+    const distText = `${distance} KM`;
+    const fontSize = 10;
+    ctx.font = `bold ${fontSize}px Arial`;
+    const textWidth = ctx.measureText(distText).width;
+    
+    // Create a semi-transparent background for better readability
+    ctx.fillStyle = isDarkMode ? "rgba(30, 30, 30, 0.75)" : "rgba(255, 255, 255, 0.75)";
+    ctx.beginPath();
+    ctx.roundRect(finalX - textWidth/2 - 4, finalY - fontSize/2 - 3, textWidth + 8, fontSize + 6, 4);
+    ctx.fill();
+    
+    // Add a subtle border for better visibility
+    ctx.strokeStyle = isDarkMode ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)";
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    
+    // Draw the distance text with KM unit
+    ctx.fillStyle = isDarkMode ? "#FFFFFF" : "#000000";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(distText, finalX, finalY);
+    
+    return;
+  }
 
-  // Draw a flag-like label for the distance
-  // Calculate position along the curve
-  const t = 0.5 // Position at the middle of the curve
+  // For fewer cities, draw the detailed flag label
+  // Calculate position along the curve with variation based on index to avoid overlaps
+  const tOffset = 0.08 + (index % 4) * 0.04; // Between 0.08 and 0.2
+  const t = 0.5 + (index % 2 === 0 ? tOffset : -tOffset); // Between 0.3 and 0.7
+  
   const labelX = (1 - t) * (1 - t) * pos1.x + 2 * (1 - t) * t * controlX + t * t * pos2.x
   const labelY = (1 - t) * (1 - t) * pos1.y + 2 * (1 - t) * t * controlY + t * t * pos2.y
 
@@ -646,8 +799,10 @@ function drawConnection(
   const flagPerpX = -normalizedTangentY
   const flagPerpY = normalizedTangentX
 
-  // Flag pole length
-  const poleLength = 35 // Longer pole
+  // Flag pole length - vary slightly to help with spacing
+  const basePoleLength = 35;
+  const poleVariation = index % 3 * 5; // Add 0, 5, or 10 pixels of variation
+  const poleLength = basePoleLength + poleVariation;
 
   // Flag dimensions
   const flagWidth = 45 // Wider flag
@@ -775,8 +930,9 @@ function drawCityNode(
   isStartCity = false,
   isHomeCity = false,  // Added isHomeCity parameter
 ) {
-  // Reduced node radius while maintaining good visibility
-  const nodeRadius = 25
+  // Dynamically reduce node radius when there are more cities
+  const totalCities = Object.keys(globalCityPositions).length;
+  const nodeRadius = Math.max(15, 25 - Math.floor((totalCities - 5) / 2) * 3);
 
   // Create a subtle glow effect
   if (isDarkMode) {
@@ -841,7 +997,7 @@ function drawCityNode(
   // Add a "home" indicator for home city
   if (isHomeCity) {
     // Draw a home icon or symbol
-    const homeSize = 10;
+    const homeSize = Math.max(5, Math.min(10, nodeRadius * 0.4));
     
     // Draw a little house shape
     ctx.beginPath();
@@ -869,7 +1025,9 @@ function drawCityNode(
 
   // Draw city label
   ctx.fillStyle = "#FFFFFF"
-  ctx.font = "bold 16px Arial"
+  // Adjust font size based on number of cities
+  const fontSize = Math.max(12, 16 - Math.floor((totalCities - 5) / 3));
+  ctx.font = `bold ${fontSize}px Arial`
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
   ctx.fillText(city.id, position.x, position.y)

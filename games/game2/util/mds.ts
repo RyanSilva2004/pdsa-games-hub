@@ -2,8 +2,13 @@
 // Input: distance matrix (2D array), output: array of {x, y} positions
 // Reference: https://en.wikipedia.org/wiki/Multidimensional_scaling
 
-export function mdsClassic(distances: number[][], dimensions = 2): { x: number; y: number }[] {
+export function mdsClassic(distances: number[][], dimensions = 2, scalingFactor = 1.0): { x: number; y: number }[] {
   const n = distances.length;
+  
+  // Much more aggressive adaptive scaling - increase scaling factor as number of cities increases
+  // This maximizes canvas usage by pushing cities closer to the edges
+  const adaptiveScaling = scalingFactor * Math.min(3.0, 1.5 + (n - 5) * 0.3);
+  
   // Step 1: Double center the distance matrix
   const M = Array.from({ length: n }, () => Array(n).fill(0));
   let rowMeans = Array(n).fill(0);
@@ -58,7 +63,7 @@ export function mdsClassic(distances: number[][], dimensions = 2): { x: number; 
         }
       }
       // Store eigenvector
-      vecs.push(v.map((x) => x * Math.sqrt(Math.max(lambda, 0))));
+      vecs.push(v.map((x) => x * Math.sqrt(Math.max(lambda, 0)) * adaptiveScaling));
       // Deflate
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
@@ -70,12 +75,17 @@ export function mdsClassic(distances: number[][], dimensions = 2): { x: number; 
   }
 
   const eigVecs = powerIteration(M, dimensions);
+  
+  // Apply even more aggressive spread for better distribution when many cities
+  // This helps utilize more of the canvas space by pushing points toward the edges
+  const spread = n > 6 ? Math.log(n) / Math.log(5) * 1.8 : 1.4;
+  
   // Transpose to get coordinates
   const coords: { x: number; y: number }[] = [];
   for (let i = 0; i < n; i++) {
     coords.push({
-      x: eigVecs[0] ? eigVecs[0][i] : 0,
-      y: eigVecs[1] ? eigVecs[1][i] : 0,
+      x: eigVecs[0] ? eigVecs[0][i] * spread : 0,
+      y: eigVecs[1] ? eigVecs[1][i] * spread : 0,
     });
   }
   return coords;
