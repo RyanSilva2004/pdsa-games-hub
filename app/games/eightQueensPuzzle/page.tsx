@@ -53,32 +53,40 @@ export const checkAndResetScoreboard = async (
   getFilteredSolutions: (type: solutionTypes) => Promise<any>,
   moveWinnerToOldAndReset: () => Promise<void>
 ) => {
-  const allSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
+  try {
+    console.log("called me?");
 
-  const validSolutions = (allSolutions?.solution || []).map((str: any) =>
-    str.split(",").slice(0, -1).join(",")
-  );
+    const allSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
+    console.log("highestScores : ", highestScores);
+    const validSolutions = (allSolutions?.solution || []).map((str: any) =>
+      str.split(",").slice(0, -1).join(",")
+    );
 
-  const allUserSolutions = highestScores.filter((sol) => sol.status === "win");
+    const allUserSolutions = highestScores.filter(
+      (sol) => sol.status === "win"
+    );
 
-  const trimmedUserSolutions = allUserSolutions
-    .map((sol) => {
-      if (!sol.moves || !Array.isArray(sol.moves)) return null;
-      const trimmed = sol.moves.slice(0, -1);
-      return trimmed.join(",");
-    })
-    .filter(Boolean);
+    const trimmedUserSolutions = allUserSolutions
+      .map((sol) => {
+        if (!sol.moves || !Array.isArray(sol.moves)) return null;
+        const trimmed = sol.moves.slice(0, -1);
+        return trimmed.join(",");
+      })
+      .filter(Boolean);
 
-  const matchedCount = trimmedUserSolutions.filter((userSol) =>
-    validSolutions.includes(userSol)
-  ).length;
+    const matchedCount = trimmedUserSolutions.filter((userSol) =>
+      validSolutions.includes(userSol)
+    ).length;
 
-  const allMatched = matchedCount === validSolutions.length;
+    const allMatched = matchedCount === validSolutions.length;
 
-  if (allMatched) {
-    await moveWinnerToOldAndReset();
-    console.log("Game reset. Winners moved to old collection.");
-    return true;
+    if (allMatched) {
+      await moveWinnerToOldAndReset();
+      console.log("Game reset. Winners moved to old collection.");
+      return true;
+    }
+  } catch (e) {
+    return false;
   }
 
   return false;
@@ -112,7 +120,9 @@ export const fetchScores = async () => {
     const allScores = await getAllWinningMoves();
 
     const sortedTopWinners = allScores
-      .filter((score) => score.status === "win")
+      .filter(
+        (score) => score.status === "win" && score.solutionType !== "known"
+      )
       .sort((a, b) => a.time - b.time);
     console.log("sortedTopWinners  : ", sortedTopWinners);
     return sortedTopWinners;
@@ -242,6 +252,8 @@ const EightQueensPuzzle = () => {
     try {
       setIsScoreBoardloading(true);
       const scoreDataSet = await fetchScores();
+      console.log("scoreDataSet : ", scoreDataSet);
+
       setHighestScores(scoreDataSet);
     } catch (e) {
       setError({ header: "Error in Fetching Score Board", description: e });
@@ -441,20 +453,20 @@ const EightQueensPuzzle = () => {
           solution.join(",")
         );
 
-        const existingSolutions = await getFilteredSolutions(
-          solutionTypes.THREADED
-        );
+        // const existingSolutions = await getFilteredSolutions(
+        //   solutionTypes.THREADED
+        // );
 
-        if (existingSolutions && existingSolutions.timeTaken > timeTaken) {
-          setSequentialTime(timeTaken);
-          await deleteSolution(existingSolutions.id);
-        } else if (
-          existingSolutions &&
-          existingSolutions.timeTaken < timeTaken
-        ) {
-          setSequentialTime(existingSolutions.timeTaken);
-          return;
-        }
+        // if (existingSolutions && existingSolutions.timeTaken === timeTaken) {
+        //   setSequentialTime(timeTaken);
+        //   await deleteSolution(existingSolutions.id);
+        // } else if (
+        //   existingSolutions &&
+        //   existingSolutions.timeTaken < timeTaken
+        // ) {
+
+        // return;
+        // }
 
         try {
           await addGeneratedSolution(
@@ -462,12 +474,15 @@ const EightQueensPuzzle = () => {
             solutionTypes.THREADED,
             timeTaken
           );
-
           resolve();
         } catch (error) {
-          console.error(`Error saving threaded solution:`, error);
+          setError({
+            header: `Error saving threaded solution:`,
+            description: error,
+          });
           reject(error);
         } finally {
+          setThreadedTime(timeTaken);
           worker.terminate();
         }
       };
@@ -488,43 +503,43 @@ const EightQueensPuzzle = () => {
     let latestTimeTaken;
     let existingSolutions;
     try {
-      existingSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
+      // existingSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
 
       const stringifiedResults = backtrackingResults.results.map((solution) =>
         solution.join(",")
       );
 
-      if (
-        !existingSolutions ||
-        existingSolutions.timeTaken > backtrackingTime
-      ) {
-        latestTimeTaken = backtrackingTime;
-        await addGeneratedSolution(
-          stringifiedResults,
-          solutionTypes.SEQUENTIAL,
-          backtrackingTime
-        );
-      } else {
-        latestTimeTaken = existingSolutions.timeTaken;
-      }
+      // if (
+      //   !existingSolutions ||
+      //   existingSolutions.timeTaken > backtrackingTime
+      // ) {
+      latestTimeTaken = backtrackingTime;
+      await addGeneratedSolution(
+        stringifiedResults,
+        solutionTypes.SEQUENTIAL,
+        backtrackingTime
+      );
+      // } else {
+      //   latestTimeTaken = existingSolutions.timeTaken;
+      // }
     } catch (error) {
-      console.error("Error saving backtracking solution:", error);
+      setError({
+        header: `Error saving backtracking solution:`,
+        description: error,
+      });
     } finally {
     }
 
-    if (existingSolutions && existingSolutions.timeTaken > backtrackingTime) {
-      await deleteSolution(existingSolutions.id);
-    }
-
-    setThreadedTime(latestTimeTaken || null);
+    setSequentialTime(latestTimeTaken || null);
   };
 
   const automationCalls = async () => {
     try {
       setIsLoading(true);
-      storeSolutionsIfNew();
-      runWorkerAndSaveSolution();
+      await storeSolutionsIfNew();
+      await runWorkerAndSaveSolution();
     } catch (e) {
+      console.error(e);
     } finally {
       setIsLoading(false);
     }

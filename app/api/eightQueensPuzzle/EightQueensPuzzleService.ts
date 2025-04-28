@@ -30,6 +30,7 @@ export type ScoreEntry = {
   date: string;
   status: string;
   moves: string[];
+  solutionType: string;
 };
 
 export const addGeneratedSolution = async (
@@ -127,6 +128,7 @@ export const getAllWinningMoves = async (): Promise<ScoreEntry[]> => {
         date: data.datePlayed ?? "",
         status: data.status,
         moves: data.moves,
+        solutionType: data.solutionType,
       });
     }
   });
