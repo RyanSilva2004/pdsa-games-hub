@@ -429,3 +429,68 @@ describe("findAllNQueensSolutionsWithTime", () => {
     }
   });
 });
+
+class MockWorker {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: ErrorEvent) => void) | null = null;
+  postedMessage: any;
+
+  constructor(stringUrl: string | URL, options?: WorkerOptions) {
+    setTimeout(() => {
+      const n = this.postedMessage?.n;
+      const results: number[][] = [];
+      if (n > 6) {
+        const numSolutions = Math.max(10, Math.floor(Math.random() * 50));
+        for (let i = 0; i < numSolutions; i++) {
+          results.push(Array(n).fill(i));
+        }
+      }
+      if (this.onmessage) {
+        this.onmessage({ data: results } as MessageEvent);
+      }
+    }, 50);
+  }
+
+  postMessage(message: any): void {
+    this.postedMessage = message;
+  }
+
+  terminate(): void {}
+}
+(global as any).Worker = MockWorker;
+describe("Performance Comparison: Sequential vs. Threaded", () => {
+  it("should compare execution time for a larger board size (n=12)", async () => {
+    const n = 12;
+
+    const startSequential = performance.now();
+    const sequentialResult = findAllNQueensSolutionsWithTime(n);
+    const endSequential = performance.now();
+    const timeSequential = endSequential - startSequential;
+    console.log(`Sequential (n=${n}): ${timeSequential.toFixed(2)} ms`);
+    console.log(
+      `Sequential (n=${n}) found ${sequentialResult.results.length} solutions.`
+    );
+
+    const startThreaded = performance.now();
+    const worker = new Worker(
+      new URL("../utils/workerThread", import.meta.url)
+    );
+    worker.postMessage({ n });
+
+    const threadedResultsPromise = new Promise<number[][]>((resolve) => {
+      worker.onmessage = (e) => {
+        const workerResults: number[][] = e.data;
+        resolve(workerResults);
+        worker.terminate();
+      };
+    });
+
+    const threadedResults = await threadedResultsPromise;
+    const endThreaded = performance.now();
+    const timeThreaded = endThreaded - startThreaded;
+    console.log(`Threaded (n=${n}): ${timeThreaded.toFixed(2)} ms`);
+    console.log(
+      `Threaded (n=${n}) simulated finding ${threadedResults.length} solutions.`
+    );
+  }, 15000);
+});
