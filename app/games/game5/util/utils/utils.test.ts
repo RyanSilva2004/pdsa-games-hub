@@ -38,14 +38,14 @@ describe('isValidKnightMove', () => {
   });
 
   it('handles negative coordinates correctly', () => {
-    expect(isValidKnightMove(-2, -1, 0, 0)).toBe(true); // Equivalent to (0,0) to (2,1)
-    expect(isValidKnightMove(-1, -2, 0, 0)).toBe(true); // Equivalent to (0,0) to (1,2)
-    expect(isValidKnightMove(-1, -1, 0, 0)).toBe(false); // Diagonal
+    expect(isValidKnightMove(-2, -1, 0, 0)).toBe(true);
+    expect(isValidKnightMove(-1, -2, 0, 0)).toBe(true); 
+    expect(isValidKnightMove(-1, -1, 0, 0)).toBe(false); 
   });
 
   it('handles symmetry of moves', () => {
-    expect(isValidKnightMove(2, 1, 0, 0)).toBe(true); // Reverse of (0,0) to (2,1)
-    expect(isValidKnightMove(1, 2, 0, 0)).toBe(true); // Reverse of (0,0) to (1,2)
+    expect(isValidKnightMove(2, 1, 0, 0)).toBe(true); 
+    expect(isValidKnightMove(1, 2, 0, 0)).toBe(true);
   });
 
   it('returns false for non-integer coordinates', () => {

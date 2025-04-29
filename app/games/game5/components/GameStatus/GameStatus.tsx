@@ -45,7 +45,7 @@ const GameStatus: FC<GameStatusProps> = ({ status, timeTaken, onRestart }) => {
               : "bg-gradient-to-br from-rose-400 to-pink-600"
           }`}
         >
-          {/* Status Icon */}
+         
           <div className="absolute -top-12 left-1/2 transform -translate-x-1/2">
             <motion.div
               initial={{ scale: 0 }}
@@ -64,7 +64,7 @@ const GameStatus: FC<GameStatusProps> = ({ status, timeTaken, onRestart }) => {
           </div>
 
           <div className="pt-12 text-center">
-            {/* Title */}
+
             <motion.h2
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -74,7 +74,7 @@ const GameStatus: FC<GameStatusProps> = ({ status, timeTaken, onRestart }) => {
               {status === "win" ? "Victory!" : "Game Over"}
             </motion.h2>
 
-            {/* Subtitle */}
+         
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -86,7 +86,7 @@ const GameStatus: FC<GameStatusProps> = ({ status, timeTaken, onRestart }) => {
                 : "No more valid moves available"}
             </motion.p>
 
-            {/* Time Display */}
+            
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -98,7 +98,7 @@ const GameStatus: FC<GameStatusProps> = ({ status, timeTaken, onRestart }) => {
               </p>
             </motion.div>
 
-            {/* Restart Button */}
+        
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -114,7 +114,7 @@ const GameStatus: FC<GameStatusProps> = ({ status, timeTaken, onRestart }) => {
             </motion.button>
           </div>
 
-          {/* Bottom shadow */}
+        
           <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
             <div className="w-3/4 h-2 bg-black/10 rounded-full blur-md"></div>
           </div>

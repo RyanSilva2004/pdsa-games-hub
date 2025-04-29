@@ -4,7 +4,7 @@ import Chessboard from './Chessboard';
 import '@testing-library/jest-dom';
 import { toast } from 'react-hot-toast';
 
-// Mock dependencies
+
 jest.mock('react-hot-toast');
 jest.mock('../Knight/Knight', () => () => <div data-testid="knight" />);
 jest.mock('../GameStatus/GameStatus', () => ({ status, timeTaken, onRestart }: any) => (
@@ -97,7 +97,7 @@ describe('Chessboard Component', () => {
       render(<Chessboard playerName={playerName} />);
     });
     
-    // Mock that all squares have been visited
+   
     const mockVisited = new Set();
     for (let i = 0; i < 8; i++) {
       for (let j = 0; j < 8; j++) {
@@ -105,13 +105,13 @@ describe('Chessboard Component', () => {
       }
     }
     
-    // Mock the visited state to trigger win condition
+    
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('chess-square')[0]);
      
     });
   
-    // Wait for async operations to complete
+     
     await act(async () => {
       await Promise.resolve();
     });
@@ -132,7 +132,7 @@ describe('Chessboard Component', () => {
      
     });
   
-    // Wait for async operations to complete
+    
     await act(async () => {
       await Promise.resolve();
     });

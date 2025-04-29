@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import GameStatus from './GameStatus';
 import '@testing-library/jest-dom';
 
-// Enhanced Framer Motion mock
 jest.mock('framer-motion', () => ({
   motion: {
     div: jest.fn().mockImplementation(({ children, ...props }) => {
@@ -26,7 +25,7 @@ jest.mock('framer-motion', () => ({
   AnimatePresence: ({ children }: any) => <>{children}</>,
 }));
 
-// Mock React Icons
+
 jest.mock('react-icons/fa', () => ({
   FaTrophy: () => <div data-testid="fa-trophy" />,
   FaSadTear: () => <div data-testid="fa-sad-tear" />,
@@ -73,7 +72,7 @@ describe('GameStatus Component', () => {
     it('has correct styling in win state', () => {
       render(<GameStatus status="win" timeTaken={90} />);
       
-      // Find the modal by its distinctive gradient classes
+     
       const modal = screen.getByText('Victory!').closest('div[class*="from-emerald-400"]');
       expect(modal).toBeInTheDocument();
       expect(modal).toHaveClass('to-teal-600');
@@ -104,7 +103,7 @@ describe('GameStatus Component', () => {
     it('has correct styling in loss state', () => {
       render(<GameStatus status="loss" timeTaken={150} />);
       
-      // Find the modal by its distinctive gradient classes
+     
       const modal = screen.getByText('Game Over').closest('div[class*="from-rose-400"]');
       expect(modal).toBeInTheDocument();
       expect(modal).toHaveClass('to-pink-600');

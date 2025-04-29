@@ -1,5 +1,5 @@
 import { addDoc, collection } from "firebase/firestore";
-import  {firestore} from "../../../../../lib/firebase";
+import {firestore} from "../../../../../lib/firebase";
 
 interface GameResult {
   playerName: string;
@@ -8,7 +8,10 @@ interface GameResult {
   moves: { row: number; col: number }[];
   algorithm: "backtracking" | "warnsdorff";
   timestamp: Date;
-
+  algorithmPerformance?: {
+  totalCalculationTime: number;
+   moveTimings: { row: number; col: number;  }[];
+  };
 }
 
 const validateGameResult = (result: GameResult): string | null => {
@@ -32,7 +35,16 @@ const validateGameResult = (result: GameResult): string | null => {
     return "Invalid algorithm";
   }
   
-
+  if (result.algorithmPerformance) {
+    if (typeof result.algorithmPerformance.totalCalculationTime !== "number" || 
+        result.algorithmPerformance.totalCalculationTime < 0) {
+      return "Invalid algorithm calculation time";
+    }
+    
+    if (!Array.isArray(result.algorithmPerformance.moveTimings)) {
+      return "Invalid algorithm move timings data";
+    }
+  }
   
   return null;
 };
@@ -45,7 +57,7 @@ const saveGameResult = async (gameResult: GameResult) => {
   }
 
   try {
-    const docRef = await addDoc(collection(firestore, "KnightsTour"), {
+    const docRef = await addDoc(collection(firestore, "KnightsTourResults"), {
       ...gameResult,
       timestamp: new Date(),
     });
