@@ -3,13 +3,12 @@ import { render, fireEvent, screen } from '@testing-library/react';
 import NameInput from './NameInput';
 import '@testing-library/jest-dom';
 
-// Mock react-icons
 jest.mock('react-icons/fa', () => ({
   FaUser: () => <div data-testid="fa-user" />,
   FaArrowRight: () => <div data-testid="fa-arrow-right" />,
 }));
 
-// Comprehensive Framer Motion mock
+
 jest.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: any) => {
@@ -49,16 +48,16 @@ describe('NameInput Component', () => {
     const input = screen.getByPlaceholderText("Enter your knight's name");
     const submitButton = screen.getByRole('button', { name: /Begin the Quest/i });
 
-    // Test empty submission
+     
     fireEvent.click(submitButton);
     expect(await screen.findByText('Please enter your name')).toBeInTheDocument();
 
-    // Test long name
+    
     fireEvent.change(input, { target: { value: 'ThisNameIsWayTooLongForTheInputField' } });
     fireEvent.click(submitButton);
     expect(await screen.findByText('Name must be less than 20 characters')).toBeInTheDocument();
 
-    // Test special characters
+    
     fireEvent.change(input, { target: { value: 'Invalid@Name' } });
     fireEvent.click(submitButton);
     expect(await screen.findByText('Name can only contain letters, numbers, and spaces')).toBeInTheDocument();
@@ -104,14 +103,14 @@ describe('NameInput Component', () => {
     const input = screen.getByPlaceholderText("Enter your knight's name");
     const iconContainer = screen.getByTestId('fa-user').parentElement;
 
-    // Default state
+     
     expect(iconContainer).not.toHaveClass('text-indigo-500');
 
-    // Focus state
+
     fireEvent.focus(input);
     expect(iconContainer).toHaveClass('text-indigo-500');
 
-    // Blur state
+
     fireEvent.blur(input);
     expect(iconContainer).not.toHaveClass('text-indigo-500');
   });

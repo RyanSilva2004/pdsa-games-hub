@@ -2,13 +2,13 @@ import { addDoc, collection } from 'firebase/firestore';
 import { saveGameResult, GameResult } from './gameService';
 import { firestore } from '../../../../../lib/firebase';
 
-// Mock Firebase Firestore
+
 jest.mock('firebase/firestore');
 jest.mock('../../../../lib/firebase', () => ({
   firestore: {},
 }));
 
-// Mock console methods to verify logging
+
 const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation();
 const mockConsoleError = jest.spyOn(console, 'error').mockImplementation();
 
