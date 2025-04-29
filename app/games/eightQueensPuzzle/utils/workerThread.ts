@@ -1,11 +1,9 @@
 interface WorkerMessage {
   n: number;
 }
-
 interface Result {
   solutions: number[][];
 }
-
 onmessage = function (e: MessageEvent<WorkerMessage>) {
   const { n } = e.data;
   const results: number[][] = [];

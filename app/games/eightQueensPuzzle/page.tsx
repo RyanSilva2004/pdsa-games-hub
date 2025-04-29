@@ -54,13 +54,15 @@ export const checkAndResetScoreboard = async (
   moveWinnerToOldAndReset: () => Promise<void>
 ) => {
   try {
-    console.log("called me?");
-
     const allSolutions = await getFilteredSolutions(solutionTypes.SEQUENTIAL);
-    console.log("highestScores : ", highestScores);
+
     const validSolutions = (allSolutions?.solution || []).map((str: any) =>
       str.split(",").slice(0, -1).join(",")
     );
+
+    if (validSolutions.length === 0) {
+      return false;
+    }
 
     const allUserSolutions = highestScores.filter(
       (sol) => sol.status === "win"
@@ -124,21 +126,25 @@ export const fetchScores = async () => {
         (score) => score.status === "win" && score.solutionType !== "known"
       )
       .sort((a, b) => a.time - b.time);
-    console.log("sortedTopWinners  : ", sortedTopWinners);
+
     return sortedTopWinners;
   } catch (e) {
     throw { header: "Error in Fetching Score Board", description: e };
   }
 };
 
+type GameOverOptions = Partial<{
+  setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setGameMessage: React.Dispatch<React.SetStateAction<string>>;
+  setIsGameEndingLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<errorType | null>>;
+  timerInterval: NodeJS.Timeout | null | undefined;
+}>;
+
 export const gameOver = async (
   queenCount: number,
   playerName: string,
   elapsedTime: number,
-  setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>,
-  setGameMessage: React.Dispatch<React.SetStateAction<string>>,
-  setIsGameEndingLoading: React.Dispatch<React.SetStateAction<boolean>>,
-  setError: React.Dispatch<React.SetStateAction<errorType | null>>,
   filteredMovesOfUser: () => string[],
   isSolutionValidate: () => Promise<boolean | null>,
   handleGamePlay: (
@@ -148,22 +154,23 @@ export const gameOver = async (
     playerName: string,
     elapsedTime: number
   ) => Promise<void>,
-  countEmptySlots: () => number,
-  timerInterval: NodeJS.Timeout | null | undefined
+  emptySlots: number,
+  options?: GameOverOptions
 ) => {
-  setIsGameEndingLoading(true);
+  options?.setIsGameEndingLoading?.(true);
   const finalMoves = filteredMovesOfUser();
+  console.log("queenCount : ", queenCount);
+  console.log("emptySlots : ", emptySlots);
 
-  if (queenCount + 1 === BOARD_SIZE) {
+  if (queenCount === BOARD_SIZE && emptySlots === 0) {
     const isKnownSolution = await isSolutionValidate();
-
-    setIsModalOpen(true);
+    options?.setIsModalOpen?.(true);
     if (isKnownSolution == null) {
-      setGameMessage(
+      options?.setGameMessage?.(
         "You have successfully solved the puzzle. However, an issue occurred during the game-winning validation. Please reload the page to see your name appear on the leaderboard."
       );
     } else {
-      setGameMessage(
+      options?.setGameMessage?.(
         isKnownSolution ? "This solution already exists!" : "You won!"
       );
     }
@@ -179,7 +186,7 @@ export const gameOver = async (
         elapsedTime
       );
     } catch (e) {
-      setError({ header: "Error in save Game", description: e });
+      options?.setError?.({ header: "Error in save Game", description: e });
     }
   } else {
     try {
@@ -191,20 +198,21 @@ export const gameOver = async (
         elapsedTime
       );
     } catch (e) {
-      setError({ header: "Error in save Game", description: e });
+      options?.setError?.({ header: "Error in save Game", description: e });
     }
 
-    setIsModalOpen(true);
-    const emptySlots = countEmptySlots();
-
+    options?.setIsModalOpen?.(true);
     if (emptySlots === 1) {
-      setGameMessage("Game over! So close! Only one move left.");
+      options?.setGameMessage?.("Game over! So close! Only one move left.");
     } else if (emptySlots > 0) {
-      setGameMessage("Game over! You are out of moves.");
+      options?.setGameMessage?.("Game over! You are out of moves.");
+    } else {
+      options?.setGameMessage?.("Game over! Give it another try!");
     }
   }
-  setIsGameEndingLoading(false);
-  if (timerInterval) clearInterval(timerInterval);
+
+  options?.setIsGameEndingLoading?.(false);
+  if (options?.timerInterval) clearInterval(options.timerInterval);
 };
 
 const EightQueensPuzzle = () => {
@@ -252,7 +260,6 @@ const EightQueensPuzzle = () => {
     try {
       setIsScoreBoardloading(true);
       const scoreDataSet = await fetchScores();
-      console.log("scoreDataSet : ", scoreDataSet);
 
       setHighestScores(scoreDataSet);
     } catch (e) {
@@ -295,24 +302,34 @@ const EightQueensPuzzle = () => {
     });
     setBoard(updatedBoard);
     setQueenCount(queenCount + 1);
+    setEmptySlots(emptySlotCount);
+  };
 
-    if (queenCount === MOVES_LIMIT || emptySlotCount === 0) {
+  const gameOverOptions = {
+    setIsModalOpen,
+    setGameMessage,
+    setIsGameEndingLoading,
+    setError,
+    timerInterval,
+  };
+
+  useEffect(() => {
+    if (queenCount === MOVES_LIMIT || emptySlots === 0) {
+      console.log("called the game over");
+
       gameOver(
         queenCount,
         playerName,
         elapsedTime,
-        setIsModalOpen,
-        setGameMessage,
-        setIsGameEndingLoading,
-        setError,
         filteredMovesOfUser,
         isSolutionValidate,
         handleGamePlay,
-        countEmptySlots,
-        timerInterval
+        emptySlots,
+        gameOverOptions
       );
+      setHintVislbe(false);
     }
-  };
+  }, [queenCount, board, emptySlots]);
 
   const findAllPossibleMoves = (
     rowIndex: number,
@@ -341,18 +358,19 @@ const EightQueensPuzzle = () => {
     return newBoard;
   };
 
-  const countEmptySlots = () => {
-    let emptySlotCount = 0;
-    board.forEach((row) => {
-      row.forEach((cell) => {
-        if (cell === 0) emptySlotCount++;
-      });
-    });
-    return emptySlotCount;
-  };
+  // const countEmptySlots = () => {
+  //   let emptySlotCount = 0;
+  //   board.forEach((row) => {
+  //     row.forEach((cell) => {
+  //       if (cell === 0) emptySlotCount++;
+  //     });
+  //   });
+  //   return emptySlotCount;
+  // };
 
   const filteredMovesOfUser = () => {
     let finalMoves: number[] = [];
+
     finalMoves = board.map((row) => row.indexOf(1));
 
     const finalMovesStr: string[] = finalMoves.map(String);
@@ -732,7 +750,7 @@ const EightQueensPuzzle = () => {
             }
           `}
                     onClick={() => {
-                      handleClick(rowIndex, colIndex), setHintVislbe(true);
+                      handleClick(rowIndex, colIndex);
                     }}
                     disabled={!isGameStarted || cell === 1 || cell === 2}
                   >
@@ -760,9 +778,7 @@ const EightQueensPuzzle = () => {
           <div className="mb-4 w-full">
             <div className="flex justify-between">
               <span className="text-sm text-gray-400">Total Empty Slots:</span>
-              <span className="font-semibold text-red-400">
-                {countEmptySlots()}
-              </span>
+              <span className="font-semibold text-red-400">{emptySlots}</span>
             </div>
           </div>
 
@@ -885,7 +901,8 @@ const EightQueensPuzzle = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-black/70 via-gray-900/80 to-black/70 p-4">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm text-center">
             {(gameMessage === "You won!" ||
-              gameMessage === "Game over! You are out of moves.") && (
+              gameMessage === "Game over! You are out of moves." ||
+              gameMessage === "Game over! Give it another try!") && (
               <div className="mb-4 flex justify-center">
                 <Image
                   src={gameMessage === "You won!" ? WinImage : LostImage}
