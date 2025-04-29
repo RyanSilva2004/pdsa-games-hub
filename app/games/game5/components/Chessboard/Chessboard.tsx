@@ -374,9 +374,7 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
               const isValidMove = getValidMoves().some(
                 (move) => move.row === rowIndex && move.col === colIndex
               );
-              const isSuggestedMove = suggestedMove && 
-                                      suggestedMove.row === rowIndex && 
-                                      suggestedMove.col === colIndex;
+            
               return (
                 <div
                 key={`${rowIndex}-${colIndex}`}
@@ -386,8 +384,7 @@ const Chessboard: FC<ChessboardProps> = ({ playerName }) => {
                 } relative ${
                   isVisited
                     ? "bg-green-200"
-                    : isSuggestedMove
-                    ? "bg-yellow-200"
+                    
                     : isValidMove
                     ? "bg-yellow-200"
                     : (rowIndex + colIndex) % 2 === 0
