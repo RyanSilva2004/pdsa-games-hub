@@ -1,10 +1,11 @@
 interface WorkerMessage {
   n: number;
-  startCol: number;
 }
-
+interface Result {
+  solutions: number[][];
+}
 onmessage = function (e: MessageEvent<WorkerMessage>) {
-  const { n, startCol } = e.data;
+  const { n } = e.data;
   const results: number[][] = [];
 
   const isSafe = (board: number[], row: number, col: number): boolean => {
@@ -30,9 +31,6 @@ onmessage = function (e: MessageEvent<WorkerMessage>) {
     }
   };
 
-  const board = Array(n).fill(-1);
-  board[0] = startCol;
-
-  solveNQueens(board, 1);
+  solveNQueens(Array(n).fill(-1), 0);
   postMessage(results);
 };
