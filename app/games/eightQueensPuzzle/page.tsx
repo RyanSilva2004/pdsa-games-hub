@@ -417,6 +417,7 @@ const EightQueensPuzzle = () => {
 
   const handleStartGame = () => {
     setIsGameStarted(true);
+    automationCalls();
     const start = Date.now();
     setStartTime(start);
 
@@ -563,10 +564,6 @@ const EightQueensPuzzle = () => {
     }
   };
 
-  useEffect(() => {
-    automationCalls();
-  }, []);
-
   const initialData = async () => {
     let existingSolutions = await getFilteredSolutions(
       solutionTypes.SEQUENTIAL
@@ -612,18 +609,22 @@ const EightQueensPuzzle = () => {
         )}
       </div>
 
-      <div className="flex justify-end text-gray-700">
-        <span>Sequential: </span>
-        <span className="font-medium text-blue-600">
-          {sequentialTime?.toFixed(4)}
-        </span>
-      </div>
-      <div className="flex justify-end text-gray-700">
-        <span>Threaded: </span>
-        <span className="font-medium text-green-600">
-          {threadedTime?.toFixed(4)}
-        </span>
-      </div>
+      {sequentialTime && (
+        <div className="flex justify-end text-gray-700">
+          <span>Sequential: </span>
+          <span className="font-medium text-blue-600">
+            {sequentialTime?.toFixed(4)}
+          </span>
+        </div>
+      )}
+      {threadedTime && (
+        <div className="flex justify-end text-gray-700">
+          <span>Threaded: </span>
+          <span className="font-medium text-green-600">
+            {threadedTime?.toFixed(4)}
+          </span>
+        </div>
+      )}
       {error && (
         <div className="fixed bottom-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-[90%] max-w-md">
           <div
