@@ -141,11 +141,10 @@ export function CityMap({
           
           // Scale and center to fit canvas with safe padding
           const totalCities = cities.length;
-          // Ensure we have enough padding to keep cities inside the canvas
-          const minPadding = 30; // Increased minimum padding to keep cities fully visible
-          // Use less horizontal padding to maximize width usage
+          // Use minimal padding to maximize canvas usage while preventing overflow
+          const minPadding = 35; // Just enough padding to prevent overflow
           const paddingY = Math.max(minPadding, 40 - (totalCities - 5) * 3);
-          const paddingX = Math.max(minPadding - 15, 25 - (totalCities - 5) * 3);
+          const paddingX = Math.max(minPadding, 35 - (totalCities - 5) * 3);
           
           const plotW = canvas.width - 2 * paddingX;
           const plotH = canvas.height - 2 * paddingY;
@@ -159,24 +158,21 @@ export function CityMap({
           
           // If data is wider than canvas proportionally
           if (dataAspect > canvasAspect) {
-            // Scale to width
+            // Scale to width, minimal compression
             scaleX = plotW / (maxX - minX || 1);
-            scaleY = scaleX * 0.9; // Slightly compress vertically to use more horizontal space
+            scaleY = scaleX * 0.98; // Very slight vertical compression
           } else {
-            // Data is taller than canvas, but we want to prioritize width usage
-            // Use a modified approach to stretch horizontally within constraints
+            // Data is taller than canvas, aggressively stretch horizontally
             scaleY = plotH / (maxY - minY || 1);
             
-            // Calculate how much we can stretch horizontally while staying in bounds
-            // Use a more aggressive horizontal stretch factor
-            const widthUtilizationFactor = Math.min(1.8, 1.2 + (canvasAspect / dataAspect - 1) * 0.9);
+            // Use a more aggressive stretch factor to spread cities out
+            const widthUtilizationFactor = Math.min(1.7, 1.2 + (canvasAspect / dataAspect - 1) * 0.8);
             scaleX = scaleY * widthUtilizationFactor;
           }
           
-          // Safety scaling factor to ensure nothing exceeds boundaries
-          // Use different safety factors for X and Y to maximize width
-          const safetyFactorY = 0.95;
-          const safetyFactorX = 0.98; // Allow X to get closer to edges
+          // Use less conservative safety factors to get closer to edges
+          const safetyFactorY = 0.97;
+          const safetyFactorX = 0.97;
           scaleX *= safetyFactorX;
           scaleY *= safetyFactorY;
           
@@ -188,6 +184,20 @@ export function CityMap({
               y: paddingY + (coord.y - minY) * scaleY,
             }
           })
+          
+          // Additional step: ensure cities stay within canvas boundaries
+          const nodeRadius = Math.max(15, 25 - Math.floor((totalCities - 5) / 2) * 3);
+          const safeMargin = nodeRadius + 15; // Extra margin to ensure cities and labels fit
+          
+          Object.values(newPositions).forEach(pos => {
+            // Constrain x position
+            if (pos.x < safeMargin) pos.x = safeMargin;
+            if (pos.x > canvas.width - safeMargin) pos.x = canvas.width - safeMargin;
+            
+            // Constrain y position
+            if (pos.y < safeMargin) pos.y = safeMargin;
+            if (pos.y > canvas.height - safeMargin) pos.y = canvas.height - safeMargin;
+          });
           
           // Ensure cities aren't too close to each other
           // Use a dynamic minimum distance based on the number of cities
@@ -757,6 +767,25 @@ function drawConnection(
     const fontSize = 10;
     ctx.font = `bold ${fontSize}px Arial`;
     const textWidth = ctx.measureText(distText).width;
+    
+    // Ensure label stays within canvas boundaries
+    const canvasWidth = ctx.canvas.width;
+    const canvasHeight = ctx.canvas.height;
+    const labelPadding = 10;
+    
+    // Adjust position if too close to edges
+    if (finalX - textWidth/2 - 4 < labelPadding) {
+      finalX = labelPadding + textWidth/2 + 4;
+    }
+    if (finalX + textWidth/2 + 4 > canvasWidth - labelPadding) {
+      finalX = canvasWidth - labelPadding - textWidth/2 - 4;
+    }
+    if (finalY - fontSize/2 - 3 < labelPadding) {
+      finalY = labelPadding + fontSize/2 + 3;
+    }
+    if (finalY + fontSize/2 + 3 > canvasHeight - labelPadding) {
+      finalY = canvasHeight - labelPadding - fontSize/2 - 3;
+    }
     
     // Create a semi-transparent background for better readability
     ctx.fillStyle = isDarkMode ? "rgba(30, 30, 30, 0.75)" : "rgba(255, 255, 255, 0.75)";
