@@ -1,12 +1,12 @@
 import { solveKnightsTourBacktracking } from './backtracking';
 
 describe('solveKnightsTourBacktracking', () => {
-  // Increase timeout for these tests since we're doing actual computation
+  
   jest.setTimeout(10000);
 
   describe('valid solutions', () => {
     it('should find a solution for a valid starting position (0,0)', async () => {
-      const result = await solveKnightsTourBacktracking(0, 0, 5); // Using smaller 5x5 board
+      const result = await solveKnightsTourBacktracking(0, 0, 5);  
       expect(result).toBeInstanceOf(Array);
       if (result) {
         expect(result.length).toBe(5);
@@ -47,9 +47,9 @@ describe('solveKnightsTourBacktracking', () => {
         const flatBoard = result.flat();
         const uniqueValues = new Set(flatBoard);
         
-        expect(uniqueValues.size).toBe(25); // All squares visited
-        expect(Math.max(...flatBoard)).toBe(24); // Last move number
-        expect(Math.min(...flatBoard)).toBe(0); // Starting position
+        expect(uniqueValues.size).toBe(25);  
+        expect(Math.max(...flatBoard)).toBe(24);  
+        expect(Math.min(...flatBoard)).toBe(0); 
       }
     });
   });

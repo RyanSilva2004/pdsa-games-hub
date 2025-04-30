@@ -6,6 +6,7 @@ import QueenIcon from "@/public/icons/queen.icon";
 import Image from "next/image";
 import WinImage from "@/public/won.gif";
 import LostImage from "@/public/over.gif";
+import allreadyexist from "@/public/allreadyexist.gif";
 import findAllNQueensSolutions from "./utils/eightQueensSolver";
 import { CommonContext } from "@/context/Common";
 import { createUser, createGuestUser } from "../../api/user";
@@ -274,11 +275,18 @@ const EightQueensPuzzle = () => {
   }, [isGameEndingLoading]);
 
   const resertScoreCaller = async () => {
-    await checkAndResetScoreboard(
+    const isResetting = await checkAndResetScoreboard(
       highestScores,
       () => getFilteredSolutions(solutionTypes.SEQUENTIAL),
       moveWinnerToOldAndReset
     );
+
+    if (isResetting) {
+      setIsModalOpen(true);
+      setGameMessage(
+        "Congratulations! You have found the last remaining solution. The game will now reset."
+      );
+    }
   };
 
   useEffect(() => {
@@ -315,8 +323,6 @@ const EightQueensPuzzle = () => {
 
   useEffect(() => {
     if (queenCount === MOVES_LIMIT || emptySlots === 0) {
-      console.log("called the game over");
-
       gameOver(
         queenCount,
         playerName,
@@ -357,16 +363,6 @@ const EightQueensPuzzle = () => {
     newBoard[rowIndex][colIndex] = 1;
     return newBoard;
   };
-
-  // const countEmptySlots = () => {
-  //   let emptySlotCount = 0;
-  //   board.forEach((row) => {
-  //     row.forEach((cell) => {
-  //       if (cell === 0) emptySlotCount++;
-  //     });
-  //   });
-  //   return emptySlotCount;
-  // };
 
   const filteredMovesOfUser = () => {
     let finalMoves: number[] = [];
@@ -471,21 +467,6 @@ const EightQueensPuzzle = () => {
         const solutionStrings = workerResults.map((solution) =>
           solution.join(",")
         );
-
-        // const existingSolutions = await getFilteredSolutions(
-        //   solutionTypes.THREADED
-        // );
-
-        // if (existingSolutions && existingSolutions.timeTaken === timeTaken) {
-        //   setSequentialTime(timeTaken);
-        //   await deleteSolution(existingSolutions.id);
-        // } else if (
-        //   existingSolutions &&
-        //   existingSolutions.timeTaken < timeTaken
-        // ) {
-
-        // return;
-        // }
 
         try {
           await addGeneratedSolution(
@@ -897,22 +878,29 @@ const EightQueensPuzzle = () => {
           </div>
         </div>
       )}
-
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-black/70 via-gray-900/80 to-black/70 p-4">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm text-center">
             {(gameMessage === "You won!" ||
               gameMessage === "Game over! You are out of moves." ||
-              gameMessage === "Game over! Give it another try!") && (
+              gameMessage === "Game over! Give it another try!" ||
+              gameMessage === "This solution already exists!") && (
               <div className="mb-4 flex justify-center">
                 <Image
-                  src={gameMessage === "You won!" ? WinImage : LostImage}
+                  src={
+                    gameMessage === "You won!"
+                      ? WinImage
+                      : gameMessage === "This solution already exists!"
+                      ? allreadyexist
+                      : LostImage
+                  }
                   alt={gameMessage === "You won!" ? "You Won" : "Game Over"}
                   width={120}
                   height={120}
                   className="mx-auto rounded-lg shadow-md object-contain"
                 />
               </div>
+              //
             )}
             <h3 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white mb-4">
               {gameMessage}{" "}
